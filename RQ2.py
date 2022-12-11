@@ -1,12 +1,12 @@
-import numpy as np
-
-from transformers import RobertaConfig, RobertaTokenizer, RobertaForMaskedLM, pipeline, TrainingArguments, Trainer, DataCollatorForLanguageModeling, TFAutoModelForMaskedLM
+from transformers import RobertaTokenizer, RobertaForMaskedLM, pipeline, TrainingArguments, Trainer, \
+    DataCollatorForLanguageModeling
 from datasets import load_dataset, DatasetDict
 
 import evaluate
 import torch
 
 from utils import Config
+
 
 def init_model_tokenizer(model_name: str) -> (RobertaForMaskedLM, RobertaTokenizer):
     if not torch.cuda.is_available():
@@ -24,23 +24,9 @@ def init_model_tokenizer(model_name: str) -> (RobertaForMaskedLM, RobertaTokeniz
 
     return model, tokenizer
 
-def prepare_dataset(tokenizer: RobertaTokenizer) -> DatasetDict:
-    prepath = Config.PREPROCESSED_DIFFS_PATH
-    dataset = load_dataset("csv", data_files=[
-        str(prepath / "facebook-react.csv"),
-        str(prepath / "huggingface-transformers.csv"),
-        str(prepath / "huggingface-datasets.csv"),
-        str(prepath / "atom-atom.csv"),
-        str(prepath / "mrdoob-three.js.csv"),
-        str(prepath / "nicolargo-glances.csv"),
-        str(prepath / "spring-projects-spring-framework.csv"),
-        str(prepath / "vercel-next.js.csv"),
-        str(prepath / "chartjs-Chart.js.csv"),
-    ])
 
-    dataset = dataset.remove_columns("Unnamed: 0")
-    dataset = dataset['train']
-    dataset = dataset.train_test_split(test_size=0.3)
+def prepare_dataset(tokenizer: RobertaTokenizer) -> DatasetDict:
+    dataset = load_dataset("mamiksik/CommitDiffs", use_auth_token=True)
 
     def preprocess(examples):
         outputs = []
@@ -81,8 +67,8 @@ def compute_metrics(metric, eval_pred):
 
 
 def main():
-    model_name = "microsoft/codebert-base-mlm" #"huggingface/CodeBERTa-small-v1" #
-    model_output_path = Config.MODEL_CHECKPOIN_BASE_PATH / 'code-berta-large-experiment-3'
+    model_name = "microsoft/codebert-base-mlm"  # "huggingface/CodeBERTa-small-v1" #
+    model_output_path = Config.MODEL_CHECKPOINT_BASE_PATH / 'code-berta-large-experiment-3'
     print(f'▶️  Model name: {model_name}')
     print(f'▶️  Output path: {str(model_output_path)}')
 
@@ -99,15 +85,12 @@ def main():
     data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm_probability=0.15)
     training_args = TrainingArguments(
         output_dir=str(model_output_path),
+        hub_model_id="mamiksik/CommitPredictor",
         evaluation_strategy="epoch",
         learning_rate=2e-5,
         weight_decay=0.01,
-        # per_device_train_batch_size=1,
-        # per_device_eval_batch_size=1,
-        # gradient_accumulation_steps=2,
-        # eval_accumulation_steps=2,
         save_strategy="epoch",
-        save_total_limit=15, # Only last 5 models are saved. Older ones are deleted.
+        save_total_limit=15,  # Only last 5 models are saved. Older ones are deleted.
         load_best_model_at_end=True,
         num_train_epochs=5
     )
@@ -125,12 +108,15 @@ def main():
     print(f'🏋️‍♂️  Training')
     trainer.train()
     trainer.save_model(model_output_path)
+
+    print(f'Pushing model to HuggingFace Hub')
+    trainer.push_to_hub()
     print(f'🏁  Training Done')
 
 
 def predict():
     device = torch.device("cpu")
-    model_name = Config.MODEL_CHECKPOIN_BASE_PATH / 'code-berta-large-experiment-2'
+    model_name = Config.MODEL_CHECKPOINT_BASE_PATH / 'code-berta-large-experiment-2'
 
     local_model = RobertaForMaskedLM.from_pretrained(model_name)
     tokenizer = RobertaTokenizer.from_pretrained("microsoft/codebert-base-mlm")
@@ -151,6 +137,6 @@ def predict():
     for prediction in local_fill_mask(test):
         print(f"'{prediction['token_str']}' with core: {prediction['score']}")
 
+
 if __name__ == "__main__":
-    # main()
-    predict()
+    main()
