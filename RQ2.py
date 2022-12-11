@@ -5,24 +5,24 @@ from datasets import load_dataset, DatasetDict
 import evaluate
 import torch
 
-from utils import Config
+from utils import Config, init_model_tokenizer
 
 
-def init_model_tokenizer(model_name: str) -> (RobertaForMaskedLM, RobertaTokenizer):
-    if not torch.cuda.is_available():
-        print("🚨 CUDA is not avaible")
-        exit(1)
-
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-    model = RobertaForMaskedLM.from_pretrained(model_name)
-    model.to(device)
-
-    tokenizer = RobertaTokenizer.from_pretrained(model_name)
-    tokenizer.add_tokens(["<keep>", "<add>", "<remove>", "<msg>"], special_tokens=True)
-    model.resize_token_embeddings(len(tokenizer))
-
-    return model, tokenizer
+# def init_model_tokenizer(model_name: str) -> (RobertaForMaskedLM, RobertaTokenizer):
+#     if not torch.cuda.is_available():
+#         print("🚨 CUDA is not avaible")
+#         exit(1)
+#
+#     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+#
+#     model = RobertaForMaskedLM.from_pretrained(model_name)
+#     model.to(device)
+#
+#     tokenizer = RobertaTokenizer.from_pretrained(model_name)
+#     tokenizer.add_tokens(["<keep>", "<add>", "<remove>", "<msg>"], special_tokens=True)
+#     model.resize_token_embeddings(len(tokenizer))
+#
+#     return model, tokenizer
 
 
 def prepare_dataset(tokenizer: RobertaTokenizer) -> DatasetDict:
