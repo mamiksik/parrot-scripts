@@ -6,23 +6,7 @@ import evaluate
 import torch
 
 from utils import Config, init_model_tokenizer
-
-
-# def init_model_tokenizer(model_name: str) -> (RobertaForMaskedLM, RobertaTokenizer):
-#     if not torch.cuda.is_available():
-#         print("🚨 CUDA is not avaible")
-#         exit(1)
-#
-#     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-#
-#     model = RobertaForMaskedLM.from_pretrained(model_name)
-#     model.to(device)
-#
-#     tokenizer = RobertaTokenizer.from_pretrained(model_name)
-#     tokenizer.add_tokens(["<keep>", "<add>", "<remove>", "<msg>"], special_tokens=True)
-#     model.resize_token_embeddings(len(tokenizer))
-#
-#     return model, tokenizer
+import wandb
 
 
 def prepare_dataset(tokenizer: RobertaTokenizer) -> DatasetDict:
@@ -81,8 +65,11 @@ def main():
     print(f'ℹ️  Loading Dataset')
     tokenized_dataset = prepare_dataset(tokenizer)
 
+    print(f'ℹ️  Initialize wandb')
+    wandb.init(project="CommitPredictor")
+
     print(f'ℹ️  Initializing Trainer')
-    data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm_probability=0.15)
+    data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm_probability=0.20)
     training_args = TrainingArguments(
         output_dir=str(model_output_path),
         hub_model_id="mamiksik/CommitPredictor",
@@ -92,7 +79,8 @@ def main():
         save_strategy="epoch",
         save_total_limit=15,  # Only last 5 models are saved. Older ones are deleted.
         load_best_model_at_end=True,
-        num_train_epochs=5
+        num_train_epochs=3,
+        report_to=["wandb"]
     )
 
     trainer = Trainer(
