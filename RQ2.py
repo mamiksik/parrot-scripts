@@ -1,12 +1,14 @@
+import evaluate
+import torch
+import wandb
+import warnings
+
 from transformers import RobertaTokenizer, RobertaForMaskedLM, pipeline, TrainingArguments, Trainer, \
     DataCollatorForLanguageModeling
 from datasets import load_dataset, DatasetDict
-
-import evaluate
-import torch
-
 from utils import Config, init_model_tokenizer
-import wandb
+
+warnings.simplefilter(action='ignore', category=FutureWarning)
 
 
 def prepare_dataset(tokenizer: RobertaTokenizer) -> DatasetDict:
@@ -57,7 +59,7 @@ def main():
     print(f'▶️  Output path: {str(model_output_path)}')
 
     print(f'ℹ️  Loading Model and Tokenizer')
-    model, tokenizer = init_model_tokenizer(model_name)
+    model, tokenizer = init_model_tokenizer(model_name, is_cuda_required=False)
 
     print(f'ℹ️  Loading Metrics')
     metric = evaluate.load("accuracy")
@@ -72,6 +74,8 @@ def main():
     data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm_probability=0.20)
     training_args = TrainingArguments(
         output_dir=str(model_output_path),
+        overwrite_output_dir=True,
+        push_to_hub=True,
         hub_model_id="mamiksik/CommitPredictor",
         evaluation_strategy="epoch",
         learning_rate=2e-5,
@@ -95,7 +99,7 @@ def main():
 
     print(f'🏋️‍♂️  Training')
     trainer.train()
-    trainer.save_model(model_output_path)
+    # trainer.save_model(model_output_path)
 
     print(f'Pushing model to HuggingFace Hub')
     trainer.push_to_hub()
