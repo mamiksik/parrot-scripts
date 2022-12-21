@@ -9,6 +9,7 @@ from datasets import load_dataset, DatasetDict
 from utils import Config, init_model_tokenizer
 
 warnings.simplefilter(action='ignore', category=FutureWarning)
+warnings.simplefilter(action='ignore', category=UserWarning)
 
 
 def prepare_dataset(tokenizer: RobertaTokenizer) -> DatasetDict:
