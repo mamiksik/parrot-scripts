@@ -1,9 +1,18 @@
 from pathlib import Path
 
 import torch
+import wandb
 from transformers import RobertaForMaskedLM, RobertaTokenizer
 
-relative_root = Path(__file__).parent.resolve()
+relative_root = Path(__file__).parent.resolve() / '..'
+
+hyperparameter_defaults = dict(
+    learning_rate=2e-5,
+    weight_decay=0.01,
+    epochs=10,
+)
+
+wandb.init(config=hyperparameter_defaults, project="CommitPredictor")
 
 
 class Config:
@@ -30,6 +39,7 @@ def compute_metrics(metric, eval_pred):
     preds = preds[mask]
 
     return metric.compute(predictions=preds, references=labels)
+
 
 def init_model_tokenizer(model_name: str, *, tokenizer_name=None, is_cuda_required=True) -> (RobertaForMaskedLM, RobertaTokenizer):
     if tokenizer_name is None:

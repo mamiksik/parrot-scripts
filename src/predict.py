@@ -1,7 +1,5 @@
 from copy import copy
-from functools import reduce
 from math import log
-from operator import mul
 
 from transformers import RobertaTokenizer, RobertaForMaskedLM, pipeline
 
