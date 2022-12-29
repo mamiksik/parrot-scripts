@@ -3,8 +3,7 @@ import torch
 import wandb
 import warnings
 
-from transformers import RobertaTokenizer, RobertaForMaskedLM, pipeline, TrainingArguments, Trainer, \
-    DataCollatorForLanguageModeling
+from transformers import RobertaTokenizer, TrainingArguments, Trainer, DataCollatorForLanguageModeling
 from datasets import load_dataset, DatasetDict
 from utils import Config, init_model_tokenizer, compute_metrics, preprocess_logits_for_metrics
 
@@ -16,12 +15,7 @@ def prepare_dataset(tokenizer: RobertaTokenizer) -> DatasetDict:
     dataset = load_dataset("mamiksik/CommitDiffs", use_auth_token=True)
 
     def preprocess(examples):
-        outputs = []
-        for patch, message in zip(examples["patch"], examples["message"]):
-            fragment = f"<msg> {message}\n{patch}"
-            outputs.append(fragment)
-
-        inputs = tokenizer(outputs, padding="max_length", truncation=True)
+        inputs = tokenizer(examples["patch"], examples["message"], padding="max_length", truncation='only_first')
         inputs['labels'] = inputs['input_ids'].copy()
         return inputs
 
@@ -32,8 +26,8 @@ def prepare_dataset(tokenizer: RobertaTokenizer) -> DatasetDict:
 
 
 def main():
-    model_name = "microsoft/codebert-base-mlm"  # "huggingface/CodeBERTa-small-v1" #
-    model_output_path = Config.MODEL_CHECKPOINT_BASE_PATH / 'code-berta-large-experiment-3'
+    model_name = "microsoft/codebert-base-mlm"
+    model_output_path = Config.MODEL_CHECKPOINT_BASE_PATH / 'code-berta-large-experiment-4'
     print(f'▶️  Model name: {model_name}')
     print(f'▶️  Output path: {str(model_output_path)}')
 
@@ -54,23 +48,25 @@ def main():
     training_args = TrainingArguments(
         output_dir=str(model_output_path),
         overwrite_output_dir=True,
-        push_to_hub=True,
         hub_model_id="mamiksik/CommitPredictor",
-        evaluation_strategy="epoch",
+        push_to_hub=True,
+        report_to=["wandb"],
+        save_strategy="epoch",
+        evaluation_strategy="steps",
+        eval_steps=500,
         learning_rate=2e-5,
         weight_decay=0.01,
-        save_strategy="epoch",
-        save_total_limit=15,  # Only last 5 models are saved. Older ones are deleted.
-        load_best_model_at_end=True,
+        save_total_limit=5,  # Only last 5 models are saved. Older ones are deleted.
+        # load_best_model_at_end=True,
         num_train_epochs=3,
-        report_to=["wandb"]
     )
 
     trainer = Trainer(
         model=model,
+        # model_init=model_init,
         args=training_args,
         train_dataset=tokenized_dataset['train'],
-        eval_dataset=tokenized_dataset['test'],
+        eval_dataset=tokenized_dataset['test'],  # TODO: Validation set not test fix this !!!!
         compute_metrics=lambda eval_pred: compute_metrics(metric, eval_pred),
         preprocess_logits_for_metrics=preprocess_logits_for_metrics,
         data_collator=data_collator,
@@ -78,35 +74,11 @@ def main():
 
     print(f'🏋️‍♂️  Training')
     trainer.train()
-    # trainer.save_model(model_output_path)
+    trainer.save_model(model_output_path)
 
     print(f'Pushing model to HuggingFace Hub')
     trainer.push_to_hub()
     print(f'🏁  Training Done')
-
-
-def predict():
-    device = torch.device("cpu")
-    model_name = Config.MODEL_CHECKPOINT_BASE_PATH / 'code-berta-large-experiment-2'
-
-    local_model = RobertaForMaskedLM.from_pretrained(model_name)
-    tokenizer = RobertaTokenizer.from_pretrained("microsoft/codebert-base-mlm")
-
-    tokenizer.add_tokens(["<keep>", "<add>", "<remove>", "<msg>"], special_tokens=True)
-    local_model.resize_token_embeddings(len(tokenizer))
-    local_model.to(device)
-
-    # org_msg: remove unused variable
-    test = """<msg> <mask> unused variable
-    <keep> import {hydrateRoot} from 'react-dom';
-    <keep> import App from './App';
-    <remove> const root = hydrateRoot(document, <App assets={window.assetManifest} />);
-    <add> hydrateRoot(document, <App assets={window.assetManifest} />);
-    """
-
-    local_fill_mask = pipeline('fill-mask', model=local_model, tokenizer=tokenizer)
-    for prediction in local_fill_mask(test):
-        print(f"'{prediction['token_str']}' with core: {prediction['score']}")
 
 
 if __name__ == "__main__":
