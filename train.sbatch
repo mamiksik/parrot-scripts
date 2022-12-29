@@ -8,8 +8,8 @@
 #SBATCH --mem=64gb
 
 # GPUPU Requirments
-#SBATCH --gres=gpu:ampere:2
-#SBATCH --sockets-per-node=1
+#SBATCH --gres=gpu:ampere:1
+##SBATCH --sockets-per-node=1
 
 # Notification Settings
 #SBATCH --mail-type=ALL
@@ -44,6 +44,6 @@ echo "Working Directory       = $(pwd)"
 module list
 
 echo "Starting Model: "
-python3 RQ2.py
+python3 "$@"
 
 cp -r output-model/* ${SLURM_SUBMIT_DIR}/output-model/
