@@ -64,6 +64,7 @@ def main():
         model=model,
         args=training_args,
         train_dataset=tokenized_dataset['train'],
+        eval_dataset=tokenized_dataset['test'],
         compute_metrics=lambda eval_pred: compute_metrics(metric, eval_pred),
         preprocess_logits_for_metrics=preprocess_logits_for_metrics,
         data_collator=data_collator,
