@@ -52,9 +52,8 @@ def main():
         load_best_model_at_end=True,
 
         save_strategy="epoch",
-        evaluation_strategy="steps",
+        evaluation_strategy="epoch",
         save_total_limit=5,
-        eval_steps=500,
 
         learning_rate=wandb.config["learning_rate"],
         weight_decay=wandb.config["weight_decay"],
