@@ -16,7 +16,7 @@ def prepare_dataset(tokenizer: RobertaTokenizer) -> DatasetDict:
 
     def preprocess(examples):
         messages = [f"<msg> {message}" for message in examples["message"]]
-        inputs = tokenizer(examples["patch"], messages, padding="max_length", truncation='only_first')
+        inputs = tokenizer(messages, examples["patch"], padding="max_length", truncation='only_second')
         inputs['labels'] = inputs['input_ids'].copy()
         return inputs
 
