@@ -45,7 +45,7 @@ def main():
 
     patch = """<keep> def main():
 <remove>  name = "John"
-<keep>    print("Hello World!")</s></s>"""
+<keep>    print("Hello World!")</s></s><msg>"""
 
     masks: list[Mask] = [Mask()]
     while True:
@@ -54,11 +54,14 @@ def main():
             predictions = pipe(patch + ' '.join(mask()))[0]
             for prediction in predictions:
                 sub_mask = copy(mask)
+                if len(prediction['token_str']) <= 1:
+                    pass
+
                 sub_mask.append(prediction['score'], prediction['token_str'])
                 candidates.append(sub_mask)
 
         candidates.sort(key=lambda x: x.score(), reverse=True)
-        masks = candidates[:2]
+        masks = candidates[:4]
 
 
 

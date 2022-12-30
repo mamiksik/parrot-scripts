@@ -1,0 +1,14 @@
+program: train-rq2.py
+method: random
+metric:
+  goal: maximize
+  name: val_accuracy
+parameters:
+  learning_rate:
+    max: 0.00004
+    min: 0.00001
+    distribution: uniform
+  weight_decay:
+    max: 0.02
+    min: 0.005
+    distribution: uniform
