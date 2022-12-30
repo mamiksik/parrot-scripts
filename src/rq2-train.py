@@ -7,7 +7,7 @@ from transformers import RobertaTokenizer, TrainingArguments, Trainer, DataColla
 from datasets import load_dataset, DatasetDict
 
 
-from src.misc.utils import Config, init_model_tokenizer, compute_metrics, preprocess_logits_for_metrics
+from utils import Config, init_model_tokenizer, compute_metrics, preprocess_logits_for_metrics
 
 warnings.simplefilter(action='ignore', category=FutureWarning)
 warnings.simplefilter(action='ignore', category=UserWarning)

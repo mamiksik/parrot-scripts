@@ -1,4 +1,4 @@
-from src.misc.utils import Config, init_model_tokenizer
+from src.utils import Config, init_model_tokenizer
 
 
 def main():
