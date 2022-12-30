@@ -36,11 +36,11 @@ echo "Working Directory       = $(pwd)"
 module list
 
 echo "Starting Sweep: "
-#srun --gres=gpu:1 -n1 --exclusive wandb agent mamiksik/CommitPredictor/wxfe9vfn &
-#srun --gres=gpu:1 -n1 --exclusive wandb agent mamiksik/CommitPredictor/wxfe9vfn &
+#srun --gres=gpu:1 -n1 --exclusive wandb agent "$@" &
+#srun --gres=gpu:1 -n1 --exclusive wandb agent "$@" &
 
-CUDA_VISIBLE_DEVICES=0 wandb agent mamiksik/CommitPredictor/wxfe9vfn &
-CUDA_VISIBLE_DEVICES=1 wandb agent mamiksik/CommitPredictor/wxfe9vfn &
+CUDA_VISIBLE_DEVICES=0 wandb agent "$@" &
+CUDA_VISIBLE_DEVICES=1 wandb agent "$@" &
 
 wait # wait for all jobs to finish
 cp -r output-model/* ${SLURM_SUBMIT_DIR}/output-model/
