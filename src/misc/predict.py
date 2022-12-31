@@ -1,38 +1,56 @@
 from copy import copy
 from math import log
 
+import torch
+
+# from typing import Self
+
 from transformers import RobertaTokenizer, RobertaForMaskedLM, pipeline
 
 
-def fmask(prefix):
-    c = len(prefix.split())
-    return prefix + ["<mask>" for _ in range(50 - c)]
-
-class Mask:
+class PredictionCandidate:
     def __init__(self, mask=None):
         self.mask = [] if mask is None else mask
 
-    def append(self, score, token):
-        self.mask.append((score, token))
+    def copy_with(self, score: float, token: str) -> "PredictionCandidate":
+        return type(self)(mask=self.mask.copy() + [(score, token)])
 
-    def __copy__(self):
-        return type(self)(self.mask.copy())
-
-    def __call__(self):
-        c = len(self.mask)
-        return list(map(lambda x: x[1], self.mask)) + ["<mask>" for _ in range(50 - c)]
-
-    def score(self):
+    def score(self) -> int:
         return sum(map(lambda x: log(x[0]), self.mask))
 
-    def __str__(self):
-        return " ".join(self())
+    def masked(self):
+        return str(self) + "".join(["<mask>" for _ in range(20 - len(self.mask))])
+
+    def __str__(self) -> str:
+        return " ".join(map(lambda x: x[1], self.mask))
+
+
+def predict(tokenizer, model, text):
+    inputs = tokenizer(text, padding=True, truncation=True, return_tensors="pt")
+    # outputs = model(**inputs)
+    # predictions = torch.nn.functional.softmax(outputs.logits, dim=-1)
+
+    logits = model(**inputs).logits
+    mask_token_index = torch.where(inputs["input_ids"] == tokenizer.mask_token_id)[0]
+
+    mask_token_logits = logits[0, mask_token_index, :]
+    top_3_tokens = torch.topk(mask_token_logits, 3, dim=1).indices[0].tolist()
+
+    # values, predictions = predictions.topk(5)
+    # for i, (_values, _predictions) in enumerate(zip(values.tolist(), predictions.tolist())):
+    #     for v, p in zip(_values, _predictions):
+    #         print(tokenizer.decode(p))
+
+    return outputs
+
 
 def main():
-    model = RobertaForMaskedLM.from_pretrained("mamiksik/CommitPredictor")
+    model = RobertaForMaskedLM.from_pretrained(
+        "/Users/martin/.cache/huggingface/hub/models--mamiksik--CommitPredictor/snapshots/e9ac7671ff05f8e29afde84dc4a0c0d07bdc3d89"
+    )
     tokenizer = RobertaTokenizer.from_pretrained("mamiksik/CommitPredictor")
 
-    pipe = pipeline('fill-mask', model=model, tokenizer=tokenizer)
+    pipe = pipeline("fill-mask", model=model, tokenizer=tokenizer)
 
     # encoding = tokenizer(patch, msg, padding="max_length", truncation='only_first', return_tensors='pt')
     # input_ids = encoding['input_ids']
@@ -43,38 +61,28 @@ def main():
     # predictions = pipe(patch + msg)
     # print(predictions)
 
-    patch = """<keep> def main():
-<remove>  name = "John"
-<keep>    print("Hello World!")</s></s><msg>"""
+    patch = (
+        "<keep> def main():\n"
+        '<remove>  name = "John"\n'
+        '<keep>    print("Hello World!")'
+        "</s><s>"
+    )
 
-    masks: list[Mask] = [Mask()]
-    while True:
-        candidates: list[Mask] = []
-        for mask in masks:
-            predictions = pipe(patch + ' '.join(mask()))[0]
-            for prediction in predictions:
-                sub_mask = copy(mask)
-                if len(prediction['token_str']) <= 1:
-                    pass
+    candidates: list[PredictionCandidate] = [PredictionCandidate()]
+    predict(tokenizer, model, f"{patch}<msg>{candidates[0].masked()}")
 
-                sub_mask.append(prediction['score'], prediction['token_str'])
-                candidates.append(sub_mask)
-
-        candidates.sort(key=lambda x: x.score(), reverse=True)
-        masks = candidates[:4]
-
-
-
-
-    # input_ids = tokenizer.encode(patch, msg, return_tensors='pt')
-    # model.generate(
-    #     input_ids,
-    #     max_length=50,
-    #     num_beams=5,
-    #     early_stopping=True
-    # )
+    # for _ in range(10):
+    #     iter_candidates: list[PredictionCandidate] = []
+    #     for candidate in candidates:
+    #         predictions = pipe(f"<msg>{candidate.masked()}{patch}")[0]
+    #         for prediction in predictions:
+    #             iter_candidates.append(candidate.copy_with(prediction['score'], prediction['token_str']))
+    #
+    #     iter_candidates.sort(key=lambda x: x.score(), reverse=True)
+    #     candidates = iter_candidates[:4]
+    #
+    # print([str(x) for x in candidates])
 
 
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
