@@ -1,10 +1,12 @@
+import warnings
 from pathlib import Path
 
 import torch
-import wandb
 from datasets import load_dataset, DatasetDict
-from transformers import RobertaForMaskedLM, RobertaTokenizer
-from typing import Callable, Any
+from transformers import RobertaTokenizer
+
+warnings.simplefilter(action="ignore", category=FutureWarning)
+warnings.simplefilter(action="ignore", category=UserWarning)
 
 relative_root = Path(__file__).parent.resolve() / ".."
 

@@ -1,9 +1,7 @@
 import evaluate
 import nltk as nltk
 import numpy as np
-import torch
 import wandb
-import warnings
 
 from transformers import (
     RobertaTokenizer,
@@ -15,9 +13,6 @@ from transformers import (
 )
 
 from utils import Config, hyperparameter_defaults, prepare_dataset, device
-
-warnings.simplefilter(action="ignore", category=FutureWarning)
-warnings.simplefilter(action="ignore", category=UserWarning)
 
 wandb.init(config=hyperparameter_defaults, project="CommitPredictorT5")
 

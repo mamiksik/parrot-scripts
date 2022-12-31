@@ -2,14 +2,12 @@ import evaluate
 import torch
 
 import wandb
-import warnings
 
 from transformers import (
     RobertaTokenizer,
     TrainingArguments,
     Trainer,
     DataCollatorForLanguageModeling,
-    EarlyStoppingCallback,
     RobertaForMaskedLM,
 )
 
@@ -20,9 +18,6 @@ from utils import (
     prepare_dataset,
     device,
 )
-
-warnings.simplefilter(action="ignore", category=FutureWarning)
-warnings.simplefilter(action="ignore", category=UserWarning)
 
 wandb.init(config=hyperparameter_defaults, project="CommitPredictor")
 
