@@ -18,16 +18,11 @@ wandb.init(config=hyperparameter_defaults, project="CommitPredictorT5")
 
 
 def preprocess(tokenizer: RobertaTokenizer, examples):
-    inputs, targets = [], []
-    for i in examples:
-        inputs.append(i["patch"])
-        targets.append(i["message"])
-
     model_inputs = tokenizer(
-        inputs, max_length=412, padding="max_length", truncation=True
+        examples["patch"], max_length=412, padding="max_length", truncation=True
     )
     labels = tokenizer(
-        text_target=targets, max_length=100, padding="max_length", truncation=True
+        text_target=examples["message"], max_length=100, padding="max_length", truncation=True
     )
     model_inputs["labels"] = labels["input_ids"]
 
