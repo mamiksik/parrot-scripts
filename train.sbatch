@@ -1,15 +1,13 @@
 #!/bin/bash
-# General Requirments
-#####SBATCH --partition=ram
+# General Requirements
 #SBATCH --constraint="[a40|a100]&[avx2|avx]"
 
-# CPU Requirments
+# CPU Requirements
 #SBATCH -c 16
 #SBATCH --mem=64gb
 
 # GPUPU Requirments
-#SBATCH --gres=gpu:ampere:1
-##SBATCH --sockets-per-node=1
+#SBATCH --gres=gpu:amper:1
 
 # Notification Settings
 #SBATCH --mail-type=ALL
@@ -20,15 +18,8 @@ if [ -z "$CUDA_VISIBLE_DEVICES" ]; then
   export CUDA_VISIBLE_DEVICES=""
 fi
 
-
 # load python 3.10
 module load python
-
-# load nvidia cuda toolkit(s)
-#module load nvidia/cuda-11.8
-#module load nvidia/cuda-11.3
-#module load nvidia/cuda-11.3_cudnn-8.2
-#module load nvidia/cuda-11.3_tensorrt-8.0
 
 cd /local
 mkdir ${SLURM_JOBID}
