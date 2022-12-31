@@ -88,6 +88,7 @@ def main():
         hub_model_id="mamiksik/CommitPredictor",
         report_to=["wandb"],
         push_to_hub=True,
+        hub_strategy="end",
         overwrite_output_dir=True,
         load_best_model_at_end=True,
         save_strategy="epoch",
@@ -115,7 +116,7 @@ def main():
     trainer.save_model(model_output_path)
 
     print(f"Pushing model to HuggingFace Hub")
-    trainer.push_to_hub()
+    trainer.push_to_hub(f"End of training {wandb.run.name}")
     print(f"🏁  Training Done")
 
 
