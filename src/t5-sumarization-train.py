@@ -103,6 +103,7 @@ def main():
         learning_rate=wandb.config["learning_rate"],
         weight_decay=wandb.config["weight_decay"],
         num_train_epochs=wandb.config["epochs"],
+        auto_find_batch_size=True,
     )
 
     trainer = Trainer(

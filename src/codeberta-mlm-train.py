@@ -115,8 +115,10 @@ def main():
     trainer.train()
     trainer.save_model(model_output_path)
 
-    print(f"Pushing model to HuggingFace Hub")
-    trainer.push_to_hub(f"End of training {wandb.run.name}")
+    print(f"🚀  Pushing model to HuggingFace Hub")
+    commit_id, _ = trainer.push_to_hub(f"End of training {wandb.run.name}", blocking=True)
+    print(f"🎉  Model pushed to HuggingFace Hub: {commit_id}")
+
     print(f"🏁  Training Done")
 
 
