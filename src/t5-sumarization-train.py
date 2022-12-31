@@ -22,7 +22,10 @@ def preprocess(tokenizer: RobertaTokenizer, examples):
         examples["patch"], max_length=412, padding="max_length", truncation=True
     )
     labels = tokenizer(
-        text_target=examples["message"], max_length=100, padding="max_length", truncation=True
+        text_target=examples["message"],
+        max_length=100,
+        padding="max_length",
+        truncation=True,
     )
     model_inputs["labels"] = labels["input_ids"]
 
@@ -96,8 +99,8 @@ def main():
         push_to_hub=True,
         hub_strategy="end",
         overwrite_output_dir=True,
-        load_best_model_at_end=True,
-        save_strategy="epoch",
+        # load_best_model_at_end=True,
+        save_strategy="no",
         evaluation_strategy="epoch",
         save_total_limit=5,
         learning_rate=wandb.config["learning_rate"],
@@ -120,8 +123,10 @@ def main():
     trainer.train()
     trainer.save_model(model_output_path)
 
-    print(f"Pushing model to HuggingFace Hub")
-    trainer.push_to_hub(f"End of training {wandb.run.name}")
+    print(f"🚀  Pushing model to HuggingFace Hub")
+    commit_id = trainer.push_to_hub(f"End of training {wandb.run.name}", blocking=True)
+    print(f"🎉  Model pushed to HuggingFace Hub: {commit_id}")
+
     print(f"🏁  Training Done")
 
 

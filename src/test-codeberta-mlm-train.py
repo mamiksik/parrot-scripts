@@ -1,5 +1,6 @@
 import evaluate
 import torch
+from datasets import DatasetDict, Dataset
 
 import wandb
 
@@ -20,11 +21,12 @@ from utils import (
     device,
 )
 
-wandb.init(config=hyperparameter_defaults, project="CommitPredictor")
+wandb.init(config=hyperparameter_defaults, project="Testing")
 
 
 def preprocess(tokenizer, examples):
-    messages = [f"<msg>{message}" for message in examples["message"]]
+    # messages = [f"<msg>{message}" for message in examples["message"]]
+    messages = [f"<msg>{patch[:50]}" for patch in examples["patch"]]
     inputs = tokenizer(
         examples["patch"], messages, padding="max_length", truncation="only_first"
     )
@@ -84,21 +86,27 @@ def main():
         tokenizer=tokenizer, mlm_probability=0.20
     )
 
+    tokenized_dataset = DatasetDict(
+        {
+            "train": Dataset.from_dict(tokenized_dataset["train"][:300]),
+            "test": Dataset.from_dict(tokenized_dataset["test"][:300]),
+        }
+    )
+
     training_args = TrainingArguments(
         output_dir=str(model_output_path),
-        overwrite_output_dir=True,
-        hub_model_id="mamiksik/CommitPredictor",
+        hub_model_id="mamiksik/Testing",
         report_to=["wandb"],
         push_to_hub=True,
         hub_strategy="end",
-        load_best_model_at_end=False,
-        save_strategy="no",
+        overwrite_output_dir=True,
+        load_best_model_at_end=True,
+        save_strategy="epoch",
         evaluation_strategy="epoch",
         save_total_limit=50,
         learning_rate=wandb.config["learning_rate"],
         weight_decay=wandb.config["weight_decay"],
-        # num_train_epochs=wandb.config["epochs"],
-        num_train_epochs=5,
+        num_train_epochs=wandb.config["epochs"],
     )
 
     trainer = Trainer(

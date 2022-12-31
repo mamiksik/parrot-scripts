@@ -45,9 +45,7 @@ def predict(tokenizer, model, text):
 
 
 def main():
-    model = RobertaForMaskedLM.from_pretrained(
-        "/Users/martin/.cache/huggingface/hub/models--mamiksik--CommitPredictor/snapshots/e9ac7671ff05f8e29afde84dc4a0c0d07bdc3d89"
-    )
+    model = RobertaForMaskedLM.from_pretrained("mamiksik/Testing")
     tokenizer = RobertaTokenizer.from_pretrained("mamiksik/CommitPredictor")
 
     pipe = pipeline("fill-mask", model=model, tokenizer=tokenizer)
@@ -62,10 +60,7 @@ def main():
     # print(predictions)
 
     patch = (
-        "<keep> def main():\n"
-        '<remove>  name = "John"\n'
-        '<keep>    print("Hello World!")'
-        "</s><s>"
+        "<keep>def main():" '<keep>   print("Hello World!")' '<remove>   name = "John"'
     )
 
     candidates: list[PredictionCandidate] = [PredictionCandidate()]
