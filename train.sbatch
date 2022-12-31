@@ -6,8 +6,8 @@
 #SBATCH -c 16
 #SBATCH --mem=64gb
 
-# GPUPU Requirments
-#SBATCH --gres=gpu:amper:1
+# GPU Requirements
+#SBATCH --gres=gpu:2
 
 # Notification Settings
 #SBATCH --mail-type=ALL
