@@ -33,6 +33,7 @@ def preprocess(tokenizer, examples):
         examples["patch"], messages, padding="max_length", truncation="only_first"
     )
     inputs["labels"] = inputs["input_ids"].copy()
+    return inputs
 
 
 def init_model_tokenizer(
@@ -99,7 +100,8 @@ def main():
         save_total_limit=5,
         learning_rate=wandb.config["learning_rate"],
         weight_decay=wandb.config["weight_decay"],
-        num_train_epochs=wandb.config["epochs"],
+        # num_train_epochs=wandb.config["epochs"],
+        num_train_epochs=3,
     )
 
     trainer = Trainer(
@@ -110,7 +112,7 @@ def main():
         compute_metrics=lambda eval_pred: compute_metrics(metric, eval_pred),
         preprocess_logits_for_metrics=preprocess_logits_for_metrics,
         data_collator=data_collator,
-        callbacks=[EarlyStoppingCallback(early_stopping_patience=3)],
+        # callbacks=[EarlyStoppingCallback(early_stopping_patience=3)],
     )
 
     print(f"🏋️‍♂️  Training")
