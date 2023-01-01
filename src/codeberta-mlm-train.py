@@ -92,11 +92,6 @@ def main():
     print(f"ℹ️  Loading Dataset")
     tokenized_dataset = prepare_dataset(tokenizer, preprocess)
 
-    tokenized_dataset = DatasetDict({
-        'train': Dataset.from_dict(tokenized_dataset['train'][:10]),
-        'test': Dataset.from_dict(tokenized_dataset['test'][:10])
-    })
-
     print(f"ℹ️  Initializing Trainer")
     data_collator = DataCollatorForLanguageModeling(
         tokenizer=tokenizer, mlm_probability=0.20
