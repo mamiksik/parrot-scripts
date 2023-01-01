@@ -128,7 +128,7 @@ def main():
 
         num_train_epochs=100,
         bf16=True,
-        metric_for_best_model="eval_loss",
+        metric_for_best_model="eval_bleu",
 
         predict_with_generate=True,
         auto_find_batch_size=True,
