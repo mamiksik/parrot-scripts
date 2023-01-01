@@ -105,8 +105,9 @@ def main():
         save_total_limit=5,
         learning_rate=wandb.config["learning_rate"],
         weight_decay=wandb.config["weight_decay"],
-        num_train_epochs=wandb.config["epochs"],
+        num_train_epochs=5,
         auto_find_batch_size=True,
+        bf16=True,
     )
 
     trainer = Trainer(
@@ -116,7 +117,7 @@ def main():
         eval_dataset=tokenized_dataset["test"],
         compute_metrics=lambda eval_pred: compute_metrics(metric, tokenizer, eval_pred),
         data_collator=data_collator,
-        callbacks=[EarlyStoppingCallback(early_stopping_patience=3)],
+        # callbacks=[EarlyStoppingCallback(early_stopping_patience=3)],
     )
 
     print(f"🏋️‍♂️  Training")
@@ -124,7 +125,7 @@ def main():
     trainer.save_model(model_output_path)
 
     print(f"🚀  Pushing model to HuggingFace Hub")
-    commit_id = trainer.push_to_hub(f"End of training {wandb.run.name}", blocking=True)
+    commit_id = trainer.push_to_hub(f"End of training (5 epoch, bf16=True) {wandb.run.name}", blocking=True)
     print(f"🎉  Model pushed to HuggingFace Hub: {commit_id}")
 
     print(f"🏁  Training Done")
