@@ -26,11 +26,12 @@ wandb.init(config=hyperparameter_defaults, project="Testing")
 
 def preprocess(tokenizer, examples):
     # messages = [f"<msg>{message}" for message in examples["message"]]
-    messages = [f"<msg>{patch[:50]}" for patch in examples["patch"]]
+    messages = [f"<msg> {patch[:150]}" for patch in examples["patch"]]
     inputs = tokenizer(
         examples["patch"], messages, padding="max_length", truncation="only_first"
     )
     inputs["labels"] = inputs["input_ids"].copy()
+
     return inputs
 
 
@@ -86,13 +87,6 @@ def main():
         tokenizer=tokenizer, mlm_probability=0.20
     )
 
-    # tokenized_dataset = DatasetDict(
-    #     {
-    #         "train": Dataset.from_dict(tokenized_dataset["train"][:300]),
-    #         "test": Dataset.from_dict(tokenized_dataset["test"][:300]),
-    #     }
-    # )
-
     training_args = TrainingArguments(
         output_dir=str(model_output_path),
         hub_model_id="mamiksik/Testing",
@@ -106,7 +100,7 @@ def main():
         save_total_limit=50,
         learning_rate=wandb.config["learning_rate"],
         weight_decay=wandb.config["weight_decay"],
-        num_train_epochs=wandb.config["epochs"],
+        num_train_epochs=50,
     )
 
     trainer = Trainer(

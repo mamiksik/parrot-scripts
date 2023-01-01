@@ -24,11 +24,17 @@ from utils import (
 wandb.init(config=hyperparameter_defaults, project="CommitPredictor")
 
 
-def preprocess(tokenizer, examples):
-    messages = [f"<msg>{message}" for message in examples["message"]]
+def preprocess(tokenizer: RobertaTokenizer, examples):
+    messages = [f"<msg> {message}" for message in examples["message"]]
     inputs = tokenizer(
-        examples["patch"], messages, padding="max_length", truncation="only_first"
+        examples["patch"], messages, padding="max_length", truncation="only_first",
+
+        # https://github.com/neulab/code-bert-score/blob/main/run_mlm.py#L448
+        # We use this option because DataCollatorForLanguageModeling (see below) is more efficient when it
+        # receives the `special_tokens_mask`.
+        return_special_tokens_mask=True,
     )
+
     inputs["labels"] = inputs["input_ids"].copy()
     return inputs
 
@@ -104,14 +110,18 @@ def main():
         report_to=["wandb"],
         push_to_hub=True,
         hub_strategy="end",
-        load_best_model_at_end=False,
-        save_strategy="no",
+        load_best_model_at_end=True,
+        save_strategy="epoch",
         evaluation_strategy="epoch",
         save_total_limit=50,
         learning_rate=wandb.config["learning_rate"],
         weight_decay=wandb.config["weight_decay"],
-        # num_train_epochs=wandb.config["epochs"],
-        num_train_epochs=5,
+
+        num_train_epochs=50,
+        metric_for_best_model='eval_loss',
+
+        per_device_train_batch_size=16,
+        per_device_eval_batch_size=16,
     )
 
     trainer = Trainer(
@@ -122,7 +132,7 @@ def main():
         compute_metrics=lambda eval_pred: compute_metrics(tokenizer, metric, eval_pred),
         preprocess_logits_for_metrics=preprocess_logits_for_metrics,
         data_collator=data_collator,
-        # callbacks=[EarlyStoppingCallback(early_stopping_patience=3)],
+        callbacks=[EarlyStoppingCallback(early_stopping_patience=3)],
     )
 
     print(f"🏋️‍♂️  Training")
