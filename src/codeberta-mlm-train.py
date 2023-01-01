@@ -61,8 +61,8 @@ def compute_metrics(metric, eval_pred):
     preds = preds[mask]
     return {
         'accuracy': metric['accuracy'].compute(predictions=preds, references=labels),
-        'f1': metric['f1'].compute(predictions=preds, references=labels),
-        'bleu4': metric['bleu4'].compute(predictions=preds, references=labels, smooth=True),
+        'f1': metric['f1'].compute(predictions=preds, references=labels)['f1'],
+        'bleu4': metric['bleu4'].compute(predictions=preds, references=labels, smooth=True)["bleu"],
     }
 
 
