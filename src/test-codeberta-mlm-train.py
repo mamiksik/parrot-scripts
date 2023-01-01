@@ -86,12 +86,12 @@ def main():
         tokenizer=tokenizer, mlm_probability=0.20
     )
 
-    tokenized_dataset = DatasetDict(
-        {
-            "train": Dataset.from_dict(tokenized_dataset["train"][:300]),
-            "test": Dataset.from_dict(tokenized_dataset["test"][:300]),
-        }
-    )
+    # tokenized_dataset = DatasetDict(
+    #     {
+    #         "train": Dataset.from_dict(tokenized_dataset["train"][:300]),
+    #         "test": Dataset.from_dict(tokenized_dataset["test"][:300]),
+    #     }
+    # )
 
     training_args = TrainingArguments(
         output_dir=str(model_output_path),
