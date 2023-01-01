@@ -93,7 +93,7 @@ def main():
 
     print(f"ℹ️  Initializing Trainer")
     data_collator = DataCollatorForLanguageModeling(
-        tokenizer=tokenizer, mlm_probability=0.20
+        tokenizer=tokenizer, mlm=False
     )
 
     training_args = TrainingArguments(
