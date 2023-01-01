@@ -81,7 +81,7 @@ def main():
     metric = {
         'accuracy': evaluate.load("accuracy"),
         'f1': evaluate.load("f1"),
-        'bleu4': evaluate.load("bleu4"),
+        'bleu4': evaluate.load("bleu"),
     }
 
     print(f"ℹ️  Loading Dataset")
