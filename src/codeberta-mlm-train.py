@@ -59,7 +59,11 @@ def compute_metrics(metric, eval_pred):
     mask = labels != -100
     labels = labels[mask]
     preds = preds[mask]
-    return metric.compute(predictions=preds, references=labels)
+    return {
+        'accuracy': metric['accuracy'].compute(predictions=preds, references=labels),
+        'f1': metric['f1'].compute(predictions=preds, references=labels),
+        'bleu4': metric['bleu4'].compute(predictions=preds, references=labels),
+    }
 
 
 def main():
@@ -74,7 +78,11 @@ def main():
     )
 
     print(f"ℹ️  Loading Metrics")
-    metric = evaluate.load("accuracy")
+    metric = {
+        'accuracy': evaluate.load("accuracy"),
+        'f1': evaluate.load("f1"),
+        'bleu4': evaluate.load("bleu4"),
+    }
 
     print(f"ℹ️  Loading Dataset")
     tokenized_dataset = prepare_dataset(tokenizer, preprocess)
@@ -116,7 +124,7 @@ def main():
     trainer.train()
 
     print(f"🚀  Pushing model to HuggingFace Hub")
-    commit_id = trainer.push_to_hub(f"End of training {wandb.run.name}", blocking=True)
+    commit_id = trainer.push_to_hub(f"End of training (f1/bleu4) {wandb.run.name}", blocking=True)
     print(f"🎉  Model pushed to HuggingFace Hub: {commit_id}")
 
     print(f"🏁  Training Done")
