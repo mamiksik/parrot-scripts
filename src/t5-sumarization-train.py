@@ -1,6 +1,8 @@
 import evaluate
 import nltk as nltk
 import numpy as np
+from datasets import DatasetDict, Dataset
+
 import wandb
 
 from transformers import (
@@ -32,34 +34,34 @@ def preprocess(tokenizer: RobertaTokenizer, examples):
     return model_inputs
 
 
-def compute_metrics(metric, tokenizer, eval_pred):
-    predictions, labels = eval_pred
-    decoded_preds = tokenizer.batch_decode(predictions, skip_special_tokens=True)
-    # Replace -100 in the labels as we can't decode them.
-    labels = np.where(labels != -100, labels, tokenizer.pad_token_id)
-    decoded_labels = tokenizer.batch_decode(labels, skip_special_tokens=True)
-
-    # Rouge expects a newline after each sentence
-    decoded_preds = [
-        "\n".join(nltk.sent_tokenize(pred.strip())) for pred in decoded_preds
-    ]
-    decoded_labels = [
-        "\n".join(nltk.sent_tokenize(label.strip())) for label in decoded_labels
-    ]
-
-    result = metric.compute(
-        predictions=decoded_preds, references=decoded_labels, use_stemmer=True
-    )
-    # Extract a few results
-    result = {key: value.mid.fmeasure * 100 for key, value in result.items()}
-
-    # Add mean generated length
-    prediction_lens = [
-        np.count_nonzero(pred != tokenizer.pad_token_id) for pred in predictions
-    ]
-    result["gen_len"] = np.mean(prediction_lens)
-
-    return {k: round(v, 4) for k, v in result.items()}
+# def compute_metrics(metric, tokenizer, eval_pred):
+#     predictions, labels = eval_pred
+#     decoded_preds = tokenizer.batch_decode(predictions, skip_special_tokens=True)
+#     # Replace -100 in the labels as we can't decode them.
+#     labels = np.where(labels != -100, labels, tokenizer.pad_token_id)
+#     decoded_labels = tokenizer.batch_decode(labels, skip_special_tokens=True)
+#
+#     # Rouge expects a newline after each sentence
+#     decoded_preds = [
+#         "\n".join(nltk.sent_tokenize(pred.strip())) for pred in decoded_preds
+#     ]
+#     decoded_labels = [
+#         "\n".join(nltk.sent_tokenize(label.strip())) for label in decoded_labels
+#     ]
+#
+#     result = metric.compute(
+#         predictions=decoded_preds, references=decoded_labels, use_stemmer=True
+#     )
+#     # Extract a few results
+#     result = {key: value.mid.fmeasure * 100 for key, value in result.items()}
+#
+#     # Add mean generated length
+#     prediction_lens = [
+#         np.count_nonzero(pred != tokenizer.pad_token_id) for pred in predictions
+#     ]
+#     result["gen_len"] = np.mean(prediction_lens)
+#
+#     return {k: round(v, 4) for k, v in result.items()}
 
 
 def load_model_and_tokenizer(model_name: str, tokenizer_name: str):
@@ -89,6 +91,11 @@ def main():
     print(f"ℹ️  Loading Dataset")
     tokenized_dataset = prepare_dataset(tokenizer, preprocess)
 
+    tokenized_dataset = DatasetDict({
+        "train": Dataset.from_dict(tokenized_dataset["train"][:1]),
+        "test": Dataset.from_dict(tokenized_dataset["test"][:1]),
+    })
+
     print(f"ℹ️  Initializing Trainer")
     data_collator = DataCollatorForSeq2Seq(tokenizer, model=model)
 
@@ -101,12 +108,12 @@ def main():
         overwrite_output_dir=True,
         # load_best_model_at_end=True,
         save_strategy="no",
-        evaluation_strategy="epoch",
+        evaluation_strategy="no",
         save_total_limit=5,
         learning_rate=wandb.config["learning_rate"],
         weight_decay=wandb.config["weight_decay"],
         num_train_epochs=5,
-        auto_find_batch_size=True,
+        # auto_find_batch_size=True,
         bf16=True,
     )
 
@@ -115,7 +122,7 @@ def main():
         args=training_args,
         train_dataset=tokenized_dataset["train"],
         eval_dataset=tokenized_dataset["test"],
-        compute_metrics=lambda eval_pred: compute_metrics(metric, tokenizer, eval_pred),
+        # compute_metrics=lambda eval_pred: compute_metrics(metric, tokenizer, eval_pred),
         data_collator=data_collator,
         # callbacks=[EarlyStoppingCallback(early_stopping_patience=3)],
     )
