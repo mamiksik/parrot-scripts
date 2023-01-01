@@ -7,7 +7,8 @@
 #SBATCH --mem=64gb
 
 # GPU Requirements
-#SBATCH --gres=gpu:2
+#SBATCH --gres=gpu:ampere:2
+#SBATCH --sockets-per-node=1
 
 # Notification Settings
 #SBATCH --mail-type=ALL
