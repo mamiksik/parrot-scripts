@@ -49,7 +49,7 @@ def init_model_tokenizer(
     return model, tokenizer
 
 
-def compute_metrics(metric, eval_pred):
+def compute_metrics(tokenizer, metric, eval_pred):
     preds, labels = eval_pred
 
     # preds have the same shape as the labels, after the argmax(-1) has been calculated
@@ -59,10 +59,14 @@ def compute_metrics(metric, eval_pred):
     mask = labels != -100
     labels = labels[mask]
     preds = preds[mask]
+
+    decoded_preds = tokenizer.batch_decode(preds, skip_special_tokens=True)
+    decoded_labels = tokenizer.batch_decode(labels, skip_special_tokens=True)
+
     return {
-        'accuracy': metric['accuracy'].compute(predictions=preds, references=labels),
+        'accuracy': metric['accuracy'].compute(predictions=preds, references=labels)['accuracy'],
         'f1': metric['f1'].compute(predictions=preds, references=labels, average='micro')['f1'],
-        'bleu4': metric['bleu4'].compute(predictions=preds, references=labels, smooth=True)["bleu"],
+        'bleu4': metric['bleu4'].compute(predictions=decoded_preds, references=decoded_labels, smooth=True)["bleu"],
     }
 
 
@@ -114,7 +118,7 @@ def main():
         args=training_args,
         train_dataset=tokenized_dataset["train"],
         eval_dataset=tokenized_dataset["test"],
-        compute_metrics=lambda eval_pred: compute_metrics(metric, eval_pred),
+        compute_metrics=lambda eval_pred: compute_metrics(tokenizer, metric, eval_pred),
         preprocess_logits_for_metrics=preprocess_logits_for_metrics,
         data_collator=data_collator,
         # callbacks=[EarlyStoppingCallback(early_stopping_patience=3)],
