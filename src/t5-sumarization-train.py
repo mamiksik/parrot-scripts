@@ -20,17 +20,18 @@ wandb.init(config=hyperparameter_defaults, project="CommitPredictorT5")
 
 def preprocess(tokenizer: RobertaTokenizer, examples):
 
-    messages = [f"summarize:\n{patch}" for patch in examples["patch"]]
+    patch = [f"summarize:\n{patch}" for patch in examples["patch"]]
     model_inputs = tokenizer(
-        messages, max_length=412, padding="max_length", truncation=True
+        patch, max_length=412, padding="max_length", truncation=True
     )
 
-    labels = tokenizer(
-        text_target=examples["message"],
-        max_length=100,
-        padding="max_length",
-        truncation=True,
-    ).input_ids
+    with tokenizer.as_target_tokenizer():
+        labels = tokenizer(
+            text_target=examples["message"],
+            max_length=100,
+            padding="max_length",
+            truncation=True,
+        ).input_ids
 
     labels_with_ignore_index = []
     for labels_example in labels:
@@ -85,7 +86,7 @@ def main():
     tokenizer_name = "Salesforce/codet5-base"
     model_name = "Salesforce/codet5-base-multi-sum"
 
-    model_output_path = Config.MODEL_CHECKPOINT_BASE_PATH / wandb.run.name
+    model_output_path = Config.MODEL_CHECKPOINT_BASE_PATH / 'dummy-3fGDjSZVogXMwZGGuTgqiL'
     print(f"▶️  Model name: {model_name}")
     print(f"▶️  Output path: {str(model_output_path)}")
 
@@ -101,12 +102,13 @@ def main():
     print(f"ℹ️  Loading Dataset")
     tokenized_dataset = prepare_dataset(tokenizer, preprocess)
 
-    # tokenized_dataset = DatasetDict({
-    #     "train": Dataset.from_dict(tokenized_dataset["train"][:2]),
-    #     "test": Dataset.from_dict(tokenized_dataset["test"][:2]),
-    # })
+    tokenized_dataset = DatasetDict({
+        "train": Dataset.from_dict(tokenized_dataset["train"][:2]),
+        "test": Dataset.from_dict(tokenized_dataset["test"][:2]),
+    })
 
     print(f"ℹ️  Initializing Trainer")
+    #
     data_collator = DataCollatorForSeq2Seq(tokenizer, model=model)
 
     training_args = Seq2SeqTrainingArguments(
@@ -133,7 +135,7 @@ def main():
         metric_for_best_model="eval_bleu",
 
         predict_with_generate=True,
-        auto_find_batch_size=True,
+        # auto_find_batch_size=True,
     )
 
     trainer = Seq2SeqTrainer(
