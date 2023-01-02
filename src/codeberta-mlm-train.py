@@ -118,10 +118,10 @@ def main():
         weight_decay=wandb.config["weight_decay"],
 
         num_train_epochs=50,
-        metric_for_best_model='eval_loss',
+        metric_for_best_model='eval_bleu4',
 
-        per_device_train_batch_size=16,
-        per_device_eval_batch_size=16,
+        # per_device_train_batch_size=16,
+        # per_device_eval_batch_size=16,
     )
 
     trainer = Trainer(
