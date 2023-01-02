@@ -20,7 +20,7 @@ wandb.init(config=hyperparameter_defaults, project="CommitPredictorT5")
 
 def preprocess(tokenizer: RobertaTokenizer, examples):
 
-    examples = [f"Generate commit message:\n{patch}" for patch in examples["patch"]]
+    examples = [f"summarize:\n{patch}" for patch in examples["patch"]]
     model_inputs = tokenizer(
         examples, max_length=412, padding="max_length", truncation=True
     )
@@ -151,7 +151,7 @@ def main():
     trainer.train()
 
     print(f"🚀  Pushing model to HuggingFace Hub")
-    commit_id = trainer.push_to_hub(f"End of training (patience=7, prefix) {wandb.run.name}", blocking=True)
+    commit_id = trainer.push_to_hub(f"End of training (patience=7, prefix=summarize) {wandb.run.name}", blocking=True)
     print(f"🎉  Model pushed to HuggingFace Hub: {commit_id}")
 
     print(f"🏁  Training Done")
