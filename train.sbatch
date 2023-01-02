@@ -22,12 +22,12 @@ fi
 # load python 3.10
 module load python
 
-cd /local
-mkdir ${SLURM_JOBID}
-cd ${SLURM_JOBID}
+#cd /local
+#mkdir ${SLURM_JOBID}
+#cd ${SLURM_JOBID}
 
 # Copy input and executable to the node
-cp -r ${SLURM_SUBMIT_DIR}/* .
+#cp -r ${SLURM_SUBMIT_DIR}/* .
 
 echo "Date                    = $(date)"
 echo "Hostname                = $(hostname -s)" # log hostname
@@ -38,4 +38,4 @@ module list
 echo "Starting Model: "
 python3 "$@"
 
-cp -r output-model/* ${SLURM_SUBMIT_DIR}/output-model/
+#cp -r output-model/* ${SLURM_SUBMIT_DIR}/output-model/
