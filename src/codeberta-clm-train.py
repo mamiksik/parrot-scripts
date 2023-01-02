@@ -9,7 +9,7 @@ from transformers import (
     TrainingArguments,
     Trainer,
     DataCollatorForLanguageModeling,
-    RobertaForCausalLM, EarlyStoppingCallback,
+    RobertaForCausalLM, EarlyStoppingCallback, RobertaConfig, Seq2SeqTrainer, Seq2SeqTrainingArguments,
 )
 
 from utils import (
@@ -40,7 +40,10 @@ def init_model_tokenizer(
         if is_cuda_required:
             exit(1)
 
-    model = RobertaForCausalLM.from_pretrained(model_name)
+    config = RobertaConfig.from_pretrained("roberta-base")
+    config.is_decoder = True
+
+    model = RobertaForCausalLM.from_pretrained(model_name, config=config)
     model.to(device)
 
     tokenizer = RobertaTokenizer.from_pretrained(tokenizer_name)
@@ -100,7 +103,7 @@ def main():
         tokenizer=tokenizer, mlm=False
     )
 
-    training_args = TrainingArguments(
+    training_args = Seq2SeqTrainingArguments(
         output_dir=str(model_output_path),
         overwrite_output_dir=True,
         hub_model_id="mamiksik/CodeBertaCLM",
@@ -117,18 +120,19 @@ def main():
         weight_decay=wandb.config["weight_decay"],
         num_train_epochs=100,
         metric_for_best_model='eval_bleu4',
+        predict_with_generate=True,
 
         # per_device_train_batch_size=16,
         # per_device_eval_batch_size=16,
     )
 
-    trainer = Trainer(
+    trainer = Seq2SeqTrainer(
         model=model,
         args=training_args,
         train_dataset=tokenized_dataset["train"],
         eval_dataset=tokenized_dataset["test"],
         compute_metrics=lambda eval_pred: compute_metrics(tokenizer, metric, eval_pred),
-        preprocess_logits_for_metrics=preprocess_logits_for_metrics,
+        # preprocess_logits_for_metrics=preprocess_logits_for_metrics,
         data_collator=data_collator,
         callbacks=[EarlyStoppingCallback(early_stopping_patience=3)],
     )
@@ -137,7 +141,7 @@ def main():
     trainer.train()
 
     print(f"🚀  Pushing model to HuggingFace Hub")
-    commit_id = trainer.push_to_hub(f"End of training (f1/bleu4) {wandb.run.name}", blocking=True)
+    commit_id = trainer.push_to_hub(f"End of training (Seq2SeqTraining) {wandb.run.name}", blocking=True)
     print(f"🎉  Model pushed to HuggingFace Hub: {commit_id}")
 
     print(f"🏁  Training Done")

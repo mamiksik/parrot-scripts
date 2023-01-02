@@ -10,7 +10,7 @@ from transformers import (
     TrainingArguments,
     Trainer,
     T5ForConditionalGeneration,
-    DataCollatorForSeq2Seq, EarlyStoppingCallback, Seq2SeqTrainingArguments,
+    DataCollatorForSeq2Seq, EarlyStoppingCallback, Seq2SeqTrainingArguments, Seq2SeqTrainer,
 )
 
 from utils import Config, hyperparameter_defaults, prepare_dataset, device, preprocess_logits_for_metrics
@@ -136,7 +136,7 @@ def main():
         auto_find_batch_size=True,
     )
 
-    trainer = Trainer(
+    trainer = Seq2SeqTrainer(
         model=model,
         args=training_args,
         train_dataset=tokenized_dataset["train"],
