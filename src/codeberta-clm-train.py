@@ -118,8 +118,8 @@ def main():
         num_train_epochs=100,
         metric_for_best_model='eval_bleu4',
 
-        per_device_train_batch_size=16,
-        per_device_eval_batch_size=16,
+        # per_device_train_batch_size=16,
+        # per_device_eval_batch_size=16,
     )
 
     trainer = Trainer(
