@@ -19,8 +19,10 @@ wandb.init(config=hyperparameter_defaults, project="CommitPredictorT5")
 
 
 def preprocess(tokenizer: RobertaTokenizer, examples):
+
+    examples = [f"Generate commit message:\n{patch}" for patch in examples["patch"]]
     model_inputs = tokenizer(
-        examples["patch"], max_length=412, padding="max_length", truncation=True
+        examples, max_length=412, padding="max_length", truncation=True
     )
 
     labels = tokenizer(
@@ -126,7 +128,7 @@ def main():
         per_device_train_batch_size=16,
         per_device_eval_batch_size=16,
 
-        num_train_epochs=100,
+        num_train_epochs=30,
         bf16=True,
         metric_for_best_model="eval_bleu",
 
@@ -142,14 +144,14 @@ def main():
         compute_metrics=lambda eval_pred: compute_metrics(metrics, tokenizer, eval_pred),
         preprocess_logits_for_metrics=preprocess_logits_for_metrics,
         data_collator=data_collator,
-        callbacks=[EarlyStoppingCallback(early_stopping_patience=3)],
+        callbacks=[EarlyStoppingCallback(early_stopping_patience=7)],
     )
 
     print(f"🏋️‍♂️  Training")
     trainer.train()
 
     print(f"🚀  Pushing model to HuggingFace Hub")
-    commit_id = trainer.push_to_hub(f"End of training (100 epoch, bf16=True) {wandb.run.name}", blocking=True)
+    commit_id = trainer.push_to_hub(f"End of training (patience=7, prefix) {wandb.run.name}", blocking=True)
     print(f"🎉  Model pushed to HuggingFace Hub: {commit_id}")
 
     print(f"🏁  Training Done")
