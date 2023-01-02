@@ -102,10 +102,10 @@ def main():
     print(f"ℹ️  Loading Dataset")
     tokenized_dataset = prepare_dataset(tokenizer, preprocess)
 
-    tokenized_dataset = DatasetDict({
-        "train": Dataset.from_dict(tokenized_dataset["train"][:2]),
-        "test": Dataset.from_dict(tokenized_dataset["test"][:2]),
-    })
+    # tokenized_dataset = DatasetDict({
+    #     "train": Dataset.from_dict(tokenized_dataset["train"][:2]),
+    #     "test": Dataset.from_dict(tokenized_dataset["test"][:2]),
+    # })
 
     print(f"ℹ️  Initializing Trainer")
     #

@@ -92,10 +92,10 @@ def main():
 
     print(f"ℹ️  Loading Dataset")
     tokenized_dataset = prepare_dataset(tokenizer, preprocess)
-    tokenized_dataset = DatasetDict({
-        "train": Dataset.from_dict(tokenized_dataset["train"][:5]),
-        "test": Dataset.from_dict(tokenized_dataset["test"][:5]),
-    })
+    # tokenized_dataset = DatasetDict({
+    #     "train": Dataset.from_dict(tokenized_dataset["train"][:5]),
+    #     "test": Dataset.from_dict(tokenized_dataset["test"][:5]),
+    # })
 
     print(f"ℹ️  Initializing Trainer")
     data_collator = DataCollatorForLanguageModeling(
@@ -117,7 +117,7 @@ def main():
 
         learning_rate=wandb.config["learning_rate"],
         weight_decay=wandb.config["weight_decay"],
-        num_train_epochs=100,
+        num_train_epochs=200,
         metric_for_best_model='eval_bleu4',
 
         per_device_train_batch_size=16,
@@ -132,7 +132,7 @@ def main():
         compute_metrics=lambda eval_pred: compute_metrics(tokenizer, metric, eval_pred),
         preprocess_logits_for_metrics=preprocess_logits_for_metrics,
         data_collator=data_collator,
-        callbacks=[EarlyStoppingCallback(early_stopping_patience=10)],
+        callbacks=[EarlyStoppingCallback(early_stopping_patience=25)],
     )
 
     print(f"🏋️‍♂️  Training")
