@@ -153,7 +153,7 @@ def main():
     trainer.train()
 
     print(f"🚀  Pushing model to HuggingFace Hub")
-    commit_id = trainer.push_to_hub(f"End of training (patience=7, prefix=summarize) {wandb.run.name}", blocking=True)
+    commit_id = trainer.push_to_hub(f"End of training (patience=15, prefix=summarize) {wandb.run.name}", blocking=True)
     print(f"🎉  Model pushed to HuggingFace Hub: {commit_id}")
 
     print(f"🏁  Training Done")
