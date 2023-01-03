@@ -86,7 +86,7 @@ def main():
     tokenizer_name = "Salesforce/codet5-base"
     model_name = "Salesforce/codet5-base-multi-sum"
 
-    model_output_path = Config.MODEL_CHECKPOINT_BASE_PATH / 'dummy-3fGDjSZVogXMwZGGuTgqiL'
+    model_output_path = Config.MODEL_CHECKPOINT_BASE_PATH / wandb.run.name
     print(f"▶️  Model name: {model_name}")
     print(f"▶️  Output path: {str(model_output_path)}")
 
@@ -130,7 +130,7 @@ def main():
         per_device_train_batch_size=16,
         per_device_eval_batch_size=16,
 
-        num_train_epochs=30,
+        num_train_epochs=100,
         bf16=True,
         metric_for_best_model="eval_bleu",
 
@@ -146,7 +146,7 @@ def main():
         compute_metrics=lambda eval_pred: compute_metrics(metrics, tokenizer, eval_pred),
         preprocess_logits_for_metrics=preprocess_logits_for_metrics,
         data_collator=data_collator,
-        callbacks=[EarlyStoppingCallback(early_stopping_patience=7)],
+        callbacks=[EarlyStoppingCallback(early_stopping_patience=15)],
     )
 
     print(f"🏋️‍♂️  Training")
