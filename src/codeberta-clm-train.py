@@ -79,8 +79,10 @@ def main():
     print(f"▶️  Output path: {str(model_output_path)}")
 
     print(f"ℹ️  Loading Model and Tokenizer")
+    pretrained_model_path = '/home/dron/work/temp/BscModel/output-model/mlm/checkpoint-3164'
+
     model, tokenizer = init_model_tokenizer(
-        model_name, model_name, is_cuda_required=False
+        pretrained_model_path, model_name, is_cuda_required=False
     )
 
     print(f"ℹ️  Loading Metrics")

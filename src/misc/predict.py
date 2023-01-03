@@ -1,7 +1,13 @@
+import re
 from copy import copy
 from math import log
+from pprint import pprint
 
+import numpy as np
+import pandas as pd
 import torch
+from datasets import load_dataset
+from tqdm import tqdm
 
 # from typing import Self
 
@@ -45,38 +51,80 @@ def predict(tokenizer, model, text):
 
 
 def main():
-    model = RobertaForMaskedLM.from_pretrained("mamiksik/Testing")
-    tokenizer = RobertaTokenizer.from_pretrained("mamiksik/CommitPredictor")
+    path = '/home/dron/work/temp/BscModel/output-model/mlm/checkpoint-2260-best-bleu'
+    path = '/home/dron/work/temp/BscModel/output-model/mlm/checkpoint-452'
+    path = '/home/dron/work/temp/BscModel/output-model/mlm/checkpoint-3164'
+    path = '/home/dron/work/temp/BscModel/output-model/mlm/checkpoint-1356'
+    model = RobertaForMaskedLM.from_pretrained(path)
+    path = '/home/dron/work/temp/BscModel/output-model/mlm/'
+    tokenizer = RobertaTokenizer.from_pretrained(path)
 
-    pipe = pipeline("fill-mask", model=model, tokenizer=tokenizer)
+    gpu_index = torch.cuda.current_device()
 
-    # encoding = tokenizer(patch, msg, padding="max_length", truncation='only_first', return_tensors='pt')
-    # input_ids = encoding['input_ids']
-    # attention_mask = encoding['attention_mask']
-    # output = model(input_ids, attention_mask=attention_mask, output_attentions=False)
-    # predictions = outputs.logits.argmax(-1)
+    # Create a torch.device object for the GPU
+    device = torch.device("cuda:" + str(gpu_index))
+    # device = 'cpu'
+    pipe = pipeline("fill-mask", model=model, tokenizer=tokenizer, device=device)
 
-    # predictions = pipe(patch + msg)
-    # print(predictions)
+    dataset = load_dataset("mamiksik/CommitDiffs", use_auth_token=False)
+    df = pd.DataFrame.from_dict(dataset['train'])
+    print(df)
 
-    patch = (
-        "<keep>def main():" '<keep>   print("Hello World!")' '<remove>   name = "John"'
-    )
+    message = "<keep>def main():" '<keep>   print("Hello World!")' '<remove>   name = "John"'
+    length = 20
 
-    candidates: list[PredictionCandidate] = [PredictionCandidate()]
-    predict(tokenizer, model, f"{patch}<msg>{candidates[0].masked()}")
+    text = message + f' </s></s> <msg>' + ' <mask>' * length
 
-    # for _ in range(10):
-    #     iter_candidates: list[PredictionCandidate] = []
-    #     for candidate in candidates:
-    #         predictions = pipe(f"<msg>{candidate.masked()}{patch}")[0]
-    #         for prediction in predictions:
-    #             iter_candidates.append(candidate.copy_with(prediction['score'], prediction['token_str']))
-    #
-    #     iter_candidates.sort(key=lambda x: x.score(), reverse=True)
-    #     candidates = iter_candidates[:4]
-    #
-    # print([str(x) for x in candidates])
+    n_beams = 15
+    best_n_results = 4
+    len_multipliers = [1.5, 2, 3, 4]
+    for i, (message, patch) in tqdm(list(df.iloc[::47].iterrows())):
+        length = len(message.split())
+        commits = []
+        print(f'\nPatch: \n{"=" * 70}\n{patch[:1000]}\n{"=" * 70}\n')
+        for len_multiplier in len_multipliers:
+            commits += predict_commit(pipe, patch, int(length * len_multiplier), n_beams)[:best_n_results]
+        # person_message = input()
+        print(f'\nCommit: {message}')
+        pprint(commits)
+        print()
+
+
+def predict_commit(pipe, message, length, n_beams=7):
+    beams_prob = [0.0, 0.0]
+    text = message + f' </s></s> <msg>' + ' <mask>' * length  # so that last dim still predicts
+    beams = [text, ] * 2
+    for i in range(length):
+        beams = beams[:n_beams]
+        beams_prob = beams_prob[:n_beams]
+        try:
+            r = pipe(list(beams))  # (inputs, #mask, order){score:, sequence:, ...}
+        except RuntimeError as e:
+            print(e)
+            break
+        # handle last <mask>
+        last_mask = True if isinstance(r[0][0], dict) else False
+        # get sequences and their probs
+        new_beams = []
+        new_beams_prob = []
+        for beam_prob, input_result in zip(beams_prob, r):
+            for prediction in input_result if last_mask else input_result[0]:  # only 1st mask
+                if last_mask:   # Avoid overcompensating branches where last token is obvisous (period etc.)
+                    new_beams.append(prediction['sequence'])
+                    new_beams_prob.append(beam_prob)
+                    break   # add only the most probable last word
+                else:
+                    new_beams_prob.append(beam_prob + log(prediction['score']))
+                    new_beams.append(prediction['sequence'][4:-4])
+
+        beams = np.array(new_beams)[np.argsort(new_beams_prob)][::-1]
+        beams_prob = np.sort(new_beams_prob)[::-1]  # TODO: check correct sorting
+        # TODO: try moving cutoff to the front of the function, before pipeline
+
+        # commits = [re.findall(r"<msg> ?(.+)(<mask>)?", b)[0] for b in beams]
+        # pprint(dict(zip(beams_prob, commits)))
+    commits = [re.findall(r"<msg> ?(.*?)(<mask>|$)", b)[0][0] for b in beams]
+    return commits
 
 
 if __name__ == "__main__":

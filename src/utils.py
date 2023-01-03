@@ -32,7 +32,7 @@ def preprocess_logits_for_metrics(logits, labels):
 
 
 def prepare_dataset(tokenizer: RobertaTokenizer, preprocess) -> DatasetDict:
-    dataset = load_dataset("mamiksik/CommitDiffs", use_auth_token=True)
+    dataset = load_dataset("mamiksik/CommitDiffs", use_auth_token=False)
     tokenized_datasets = dataset.map(
         lambda x: preprocess(tokenizer, x),
         batched=True,
