@@ -71,7 +71,7 @@ def compute_metrics(tokenizer, metric, eval_pred):
     decoded_labels = tokenizer.batch_decode(labels, skip_special_tokens=True)
 
     return {
-        'accuracy': metric['accuracy'].compute(predictions=preds, references=labels)['accuracy'],
+        'accuracy': metric['accuracy'].compute(predictions=preds, references=labels, average='micro')['accuracy'],
         'f1': metric['f1'].compute(predictions=preds, references=labels, average='micro')['f1'],
         'bleu4': metric['bleu4'].compute(predictions=decoded_preds, references=decoded_labels, smooth=True)["bleu"],
     }
@@ -120,8 +120,11 @@ def main():
         num_train_epochs=50,
         metric_for_best_model='eval_bleu4',
 
-        # per_device_train_batch_size=16,
-        # per_device_eval_batch_size=16,
+        fp16=True,
+        per_device_train_batch_size=21,
+        gradient_accumulation_steps=3,
+
+        # per_device_eval_batch_size=21,
     )
 
     trainer = Trainer(
