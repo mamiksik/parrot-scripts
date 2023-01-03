@@ -71,7 +71,7 @@ def compute_metrics(tokenizer, metric, eval_pred):
     decoded_labels = tokenizer.batch_decode(labels, skip_special_tokens=True)
 
     return {
-        'accuracy': metric['accuracy'].compute(predictions=preds, references=labels, average='micro')['accuracy'],
+        'accuracy': metric['accuracy'].compute(predictions=preds, references=labels)['accuracy'],
         'f1': metric['f1'].compute(predictions=preds, references=labels, average='micro')['f1'],
         'bleu4': metric['bleu4'].compute(predictions=decoded_preds, references=decoded_labels, smooth=True)["bleu"],
     }
