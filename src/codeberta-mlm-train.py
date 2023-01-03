@@ -122,9 +122,9 @@ def main():
 
         fp16=True,
         per_device_train_batch_size=21,
-        gradient_accumulation_steps=3,
+        per_device_eval_batch_size=21,
 
-        # per_device_eval_batch_size=21,
+        gradient_accumulation_steps=3,
     )
 
     trainer = Trainer(
