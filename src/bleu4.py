@@ -9,7 +9,7 @@ from transformers import pipeline, RobertaTokenizer, RobertaForMaskedLM, Pipelin
     TrainingArguments, TrainerState, TrainerControl
 from wandb.apis.public import Run
 
-from src.utils import predict_commit
+from utils import predict_commit
 
 
 @dataclass
