@@ -13,7 +13,7 @@ from transformers import (
     EarlyStoppingCallback,
 )
 
-from src.bleu4 import AsyncBleu4Callback
+from bleu4 import AsyncBleu4Callback
 from utils import (
     Config,
     preprocess_logits_for_metrics,
