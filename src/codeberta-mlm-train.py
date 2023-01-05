@@ -97,10 +97,10 @@ def main():
         tokenizer=tokenizer, mlm_probability=0.20
     )
 
-    tokenized_dataset = DatasetDict({
-        "train": Dataset.from_dict(tokenized_dataset["train"][:100]),
-        "test": Dataset.from_dict(tokenized_dataset["test"][:100]),
-    })
+    # tokenized_dataset = DatasetDict({
+    #     "train": Dataset.from_dict(tokenized_dataset["train"][:100]),
+    #     "test": Dataset.from_dict(tokenized_dataset["test"][:100]),
+    # })
 
     training_args = TrainingArguments(
         output_dir=str(model_output_path),
@@ -116,8 +116,8 @@ def main():
         learning_rate=wandb.config["learning_rate"],
         weight_decay=wandb.config["weight_decay"],
 
+        # metric_for_best_model='eval_bleu4',
         num_train_epochs=50,
-        metric_for_best_model='eval_bleu4',
 
         fp16=True,
         per_device_train_batch_size=21,
@@ -126,26 +126,26 @@ def main():
         gradient_accumulation_steps=3,
     )
 
-    with AsyncBleu4Callback(eval_dataset=tokenized_dataset["test"], run=wandb.run) as bleu4_callback:
-        trainer = Trainer(
-            model=model,
-            args=training_args,
-            train_dataset=tokenized_dataset["train"],
-            eval_dataset=tokenized_dataset["test"],
-            compute_metrics=lambda eval_pred: compute_metrics(metric, eval_pred),
-            preprocess_logits_for_metrics=preprocess_logits_for_metrics,
-            data_collator=data_collator,
-            callbacks=[EarlyStoppingCallback(early_stopping_patience=3), bleu4_callback],
-        )
+    # with AsyncBleu4Callback(eval_dataset=tokenized_dataset["test"], run=wandb.run) as bleu4_callback:
+    trainer = Trainer(
+        model=model,
+        args=training_args,
+        train_dataset=tokenized_dataset["train"],
+        eval_dataset=tokenized_dataset["test"],
+        compute_metrics=lambda eval_pred: compute_metrics(metric, eval_pred),
+        preprocess_logits_for_metrics=preprocess_logits_for_metrics,
+        data_collator=data_collator,
+        # callbacks=[EarlyStoppingCallback(early_stopping_patience=3), bleu4_callback],
+    )
 
-        print(f"🏋️‍♂️  Training")
-        trainer.train()
+    print(f"🏋️‍♂️  Training")
+    trainer.train()
 
-        print(f"🚀  Pushing model to HuggingFace Hub")
-        commit_id = trainer.push_to_hub(f"End of training {wandb.run.name}", blocking=True)
-        print(f"🎉  Model pushed to HuggingFace Hub: {commit_id}")
+    print(f"🚀  Pushing model to HuggingFace Hub")
+    commit_id = trainer.push_to_hub(f"End of training {wandb.run.name}", blocking=True)
+    print(f"🎉  Model pushed to HuggingFace Hub: {commit_id}")
 
-        print(f"🏁  Training Done")
+    print(f"🏁  Training Done")
 
 
 if __name__ == "__main__":
