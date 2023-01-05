@@ -13,6 +13,7 @@ from transformers import (
     EarlyStoppingCallback,
 )
 
+from src.bleu4 import AsyncBleu4Callback
 from utils import (
     Config,
     preprocess_logits_for_metrics,
@@ -51,12 +52,12 @@ def init_model_tokenizer(
     model.to(device)
 
     tokenizer = RobertaTokenizer.from_pretrained(tokenizer_name)
-    tokenizer.add_tokens(["<keep>", "<add>", "<remove>", "<msg>"], special_tokens=True)
+    tokenizer.add_tokens(["<ide>", "<add>", "<del>", "<msg>"], special_tokens=True)
     model.resize_token_embeddings(len(tokenizer))
     return model, tokenizer
 
 
-def compute_metrics(tokenizer, metric, eval_pred):
+def compute_metrics(metric, eval_pred):
     preds, labels = eval_pred
 
     # preds have the same shape as the labels, after the argmax(-1) has been calculated
@@ -67,13 +68,8 @@ def compute_metrics(tokenizer, metric, eval_pred):
     labels = labels[mask]
     preds = preds[mask]
 
-    decoded_preds = tokenizer.batch_decode(preds, skip_special_tokens=True)
-    decoded_labels = tokenizer.batch_decode(labels, skip_special_tokens=True)
-
     return {
-        'accuracy': metric['accuracy'].compute(predictions=preds, references=labels)['accuracy'],
-        'f1': metric['f1'].compute(predictions=preds, references=labels, average='micro')['f1'],
-        'bleu4': metric['bleu4'].compute(predictions=decoded_preds, references=decoded_labels, smooth=True)["bleu"],
+        'accuracy': metric['accuracy'].compute(predictions=preds, references=labels)['accuracy']
     }
 
 
@@ -90,9 +86,7 @@ def main():
 
     print(f"ℹ️  Loading Metrics")
     metric = {
-        'accuracy': evaluate.load("accuracy"),
-        'f1': evaluate.load("f1"),
-        'bleu4': evaluate.load("bleu"),
+        'accuracy': evaluate.load("accuracy")
     }
 
     print(f"ℹ️  Loading Dataset")
@@ -102,6 +96,11 @@ def main():
     data_collator = DataCollatorForLanguageModeling(
         tokenizer=tokenizer, mlm_probability=0.20
     )
+
+    tokenized_dataset = DatasetDict({
+        "train": Dataset.from_dict(tokenized_dataset["train"][:100]),
+        "test": Dataset.from_dict(tokenized_dataset["test"][:100]),
+    })
 
     training_args = TrainingArguments(
         output_dir=str(model_output_path),
@@ -127,25 +126,26 @@ def main():
         gradient_accumulation_steps=3,
     )
 
-    trainer = Trainer(
-        model=model,
-        args=training_args,
-        train_dataset=tokenized_dataset["train"],
-        eval_dataset=tokenized_dataset["test"],
-        compute_metrics=lambda eval_pred: compute_metrics(tokenizer, metric, eval_pred),
-        preprocess_logits_for_metrics=preprocess_logits_for_metrics,
-        data_collator=data_collator,
-        callbacks=[EarlyStoppingCallback(early_stopping_patience=3)],
-    )
+    with AsyncBleu4Callback(eval_dataset=tokenized_dataset["test"], run=wandb.run) as bleu4_callback:
+        trainer = Trainer(
+            model=model,
+            args=training_args,
+            train_dataset=tokenized_dataset["train"],
+            eval_dataset=tokenized_dataset["test"],
+            compute_metrics=lambda eval_pred: compute_metrics(metric, eval_pred),
+            preprocess_logits_for_metrics=preprocess_logits_for_metrics,
+            data_collator=data_collator,
+            callbacks=[EarlyStoppingCallback(early_stopping_patience=3), bleu4_callback],
+        )
 
-    print(f"🏋️‍♂️  Training")
-    trainer.train()
+        print(f"🏋️‍♂️  Training")
+        trainer.train()
 
-    print(f"🚀  Pushing model to HuggingFace Hub")
-    commit_id = trainer.push_to_hub(f"End of training (f1/bleu4) {wandb.run.name}", blocking=True)
-    print(f"🎉  Model pushed to HuggingFace Hub: {commit_id}")
+        print(f"🚀  Pushing model to HuggingFace Hub")
+        commit_id = trainer.push_to_hub(f"End of training {wandb.run.name}", blocking=True)
+        print(f"🎉  Model pushed to HuggingFace Hub: {commit_id}")
 
-    print(f"🏁  Training Done")
+        print(f"🏁  Training Done")
 
 
 if __name__ == "__main__":
