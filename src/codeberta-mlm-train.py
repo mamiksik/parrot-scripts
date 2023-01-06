@@ -1,4 +1,5 @@
 import evaluate
+import numpy as np
 import torch
 from datasets import Dataset, DatasetDict
 
@@ -36,7 +37,21 @@ def preprocess(tokenizer: RobertaTokenizer, examples):
         return_special_tokens_mask=True,
     )
 
+    masking_mask = []
+    for input_ids in inputs["input_ids"]:
+        start_msg_index = input_ids.index(tokenizer.sep_token_id) + 3 # </s></s><msg>
+        try:
+            end_msg_index = input_ids.index(tokenizer.pad_token_id)
+        except ValueError:
+            end_msg_index = len(input_ids)
+
+        mask = np.zeros(len(input_ids), dtype=bool)
+        mask[start_msg_index:end_msg_index] = True
+        masking_mask.append(mask)
+
     inputs["labels"] = inputs["input_ids"].copy()
+    inputs["masking_mask"] = masking_mask
+
     return inputs
 
 
@@ -73,6 +88,37 @@ def compute_metrics(metric, eval_pred):
     }
 
 
+def msg_masking_collator(tokenizer, eval_dataset):
+    # print(inputs)
+
+    inputs = eval_dataset["input_ids"].clone()
+    labels = eval_dataset["input_ids"].clone()
+    probability_matrix = torch.full(labels.shape, 0.2)
+
+    special_tokens_mask = eval_dataset["special_tokens_mask"]
+    special_tokens_mask = special_tokens_mask.bool()
+    probability_matrix.masked_fill_(special_tokens_mask, value=0.0)
+
+    masking_mask = eval_dataset["masking_mask"]
+    masking_mask = masking_mask.bool()
+    probability_matrix.masked_fill_(~masking_mask, value=0.0)
+
+    masked_indices = torch.bernoulli(probability_matrix).bool()
+    labels[~masked_indices] = -100  # We only compute loss on masked tokens
+
+    # 80% of the time, we replace masked input tokens with tokenizer.mask_token ([MASK])
+    indices_replaced = torch.bernoulli(torch.full(labels.shape, 0.8)).bool() & masked_indices
+    inputs[indices_replaced] = tokenizer.convert_tokens_to_ids(tokenizer.mask_token)
+
+    # 10% of the time, we replace masked input tokens with random word
+    indices_random = torch.bernoulli(torch.full(labels.shape, 0.5)).bool() & masked_indices & ~indices_replaced
+    random_words = torch.randint(len(tokenizer), labels.shape, dtype=torch.long)
+    inputs[indices_random] = random_words[indices_random]
+
+    # The rest of the time (10% of the time) we keep the masked input tokens unchanged
+    return inputs, labels
+
+
 def main():
     model_name = "microsoft/codebert-base-mlm"
     model_output_path = Config.MODEL_CHECKPOINT_BASE_PATH / wandb.run.name
@@ -93,9 +139,9 @@ def main():
     tokenized_dataset = prepare_dataset(tokenizer, preprocess)
 
     print(f"ℹ️  Initializing Trainer")
-    data_collator = DataCollatorForLanguageModeling(
-        tokenizer=tokenizer, mlm_probability=0.20
-    )
+    # data_collator = DataCollatorForLanguageModeling(
+    #     tokenizer=tokenizer, mlm_probability=0.20
+    # )
 
     # tokenized_dataset = DatasetDict({
     #     "train": Dataset.from_dict(tokenized_dataset["train"][:100]),
@@ -134,7 +180,7 @@ def main():
         eval_dataset=tokenized_dataset["test"],
         compute_metrics=lambda eval_pred: compute_metrics(metric, eval_pred),
         preprocess_logits_for_metrics=preprocess_logits_for_metrics,
-        data_collator=data_collator,
+        data_collator=lambda inputs: msg_masking_collator(tokenizer, inputs),
         # callbacks=[EarlyStoppingCallback(early_stopping_patience=3), bleu4_callback],
     )
 
