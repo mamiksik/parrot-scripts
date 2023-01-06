@@ -1,7 +1,10 @@
+from typing import Any
+
 import evaluate
 import numpy as np
 import torch
 from datasets import Dataset, DatasetDict
+from transformers.data.data_collator import _torch_collate_batch, tf_default_data_collator, torch_default_data_collator
 
 import wandb
 
@@ -21,6 +24,7 @@ from utils import (
     hyperparameter_defaults,
     prepare_dataset,
     device,
+    accelerator
 )
 
 wandb.init(config=hyperparameter_defaults, project="CommitPredictor")
@@ -56,11 +60,11 @@ def preprocess(tokenizer: RobertaTokenizer, examples):
 
 
 def init_model_tokenizer(
-    model_name: str, tokenizer_name, *, is_cuda_required=True
+    model_name: str, tokenizer_name, *, is_acceleration_required=True
 ) -> (RobertaForMaskedLM, RobertaTokenizer):
-    if not torch.cuda.is_available():
-        print("🚨 CUDA is not available")
-        if is_cuda_required:
+    if accelerator == "cpu":
+        print("🚨 Acceleration is not available")
+        if is_acceleration_required:
             exit(1)
 
     model = RobertaForMaskedLM.from_pretrained(model_name)
@@ -88,18 +92,19 @@ def compute_metrics(metric, eval_pred):
     }
 
 
-def msg_masking_collator(tokenizer, eval_dataset):
-    # print(inputs)
+def msg_masking_collator(tokenizer, features: list[list[int] | Any | dict[str, Any]]):
+    batch = tokenizer.pad(features, return_tensors="pt", pad_to_multiple_of=None)
+    # features = [torch.tensor(e, dtype=torch.long) for e in features]
 
-    inputs = eval_dataset["input_ids"].clone()
-    labels = eval_dataset["input_ids"].clone()
+    inputs = batch["input_ids"].clone()
+    labels = batch["input_ids"].clone()
     probability_matrix = torch.full(labels.shape, 0.2)
 
-    special_tokens_mask = eval_dataset["special_tokens_mask"]
+    special_tokens_mask = batch.pop("special_tokens_mask")
     special_tokens_mask = special_tokens_mask.bool()
     probability_matrix.masked_fill_(special_tokens_mask, value=0.0)
 
-    masking_mask = eval_dataset["masking_mask"]
+    masking_mask = batch.pop("masking_mask")
     masking_mask = masking_mask.bool()
     probability_matrix.masked_fill_(~masking_mask, value=0.0)
 
@@ -116,18 +121,21 @@ def msg_masking_collator(tokenizer, eval_dataset):
     inputs[indices_random] = random_words[indices_random]
 
     # The rest of the time (10% of the time) we keep the masked input tokens unchanged
-    return inputs, labels
+    batch["input_ids"] = inputs
+    batch["labels"] = labels
+
+    return batch
 
 
 def main():
     model_name = "microsoft/codebert-base-mlm"
-    model_output_path = Config.MODEL_CHECKPOINT_BASE_PATH / wandb.run.name
+    model_output_path = Config.MODEL_CHECKPOINT_BASE_PATH / 'mlm'
     print(f"▶️  Model name: {model_name}")
     print(f"▶️  Output path: {str(model_output_path)}")
 
     print(f"ℹ️  Loading Model and Tokenizer")
     model, tokenizer = init_model_tokenizer(
-        model_name, model_name, is_cuda_required=False
+        model_name, model_name, is_acceleration_required=False
     )
 
     print(f"ℹ️  Loading Metrics")
@@ -139,14 +147,9 @@ def main():
     tokenized_dataset = prepare_dataset(tokenizer, preprocess)
 
     print(f"ℹ️  Initializing Trainer")
-    # data_collator = DataCollatorForLanguageModeling(
-    #     tokenizer=tokenizer, mlm_probability=0.20
-    # )
-
-    # tokenized_dataset = DatasetDict({
-    #     "train": Dataset.from_dict(tokenized_dataset["train"][:100]),
-    #     "test": Dataset.from_dict(tokenized_dataset["test"][:100]),
-    # })
+    data_collator = DataCollatorForLanguageModeling(
+        tokenizer=tokenizer, mlm_probability=0.20
+    )
 
     training_args = TrainingArguments(
         output_dir=str(model_output_path),
@@ -165,11 +168,12 @@ def main():
         # metric_for_best_model='eval_bleu4',
         num_train_epochs=50,
 
-        fp16=True,
+        fp16=accelerator == "cuda",
         per_device_train_batch_size=21,
         per_device_eval_batch_size=21,
 
         gradient_accumulation_steps=3,
+        remove_unused_columns=False,
     )
 
     # with AsyncBleu4Callback(eval_dataset=tokenized_dataset["test"], run=wandb.run) as bleu4_callback:
@@ -177,7 +181,7 @@ def main():
         model=model,
         args=training_args,
         train_dataset=tokenized_dataset["train"],
-        eval_dataset=tokenized_dataset["test"],
+        eval_dataset=tokenized_dataset["valid"],
         compute_metrics=lambda eval_pred: compute_metrics(metric, eval_pred),
         preprocess_logits_for_metrics=preprocess_logits_for_metrics,
         data_collator=lambda inputs: msg_masking_collator(tokenizer, inputs),

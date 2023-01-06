@@ -5,7 +5,7 @@ from pathlib import Path
 
 import numpy as np
 import torch
-from datasets import load_dataset, DatasetDict
+from datasets import load_dataset, DatasetDict, Dataset
 from transformers import RobertaTokenizer
 
 warnings.simplefilter(action="ignore", category=FutureWarning)
@@ -19,7 +19,13 @@ hyperparameter_defaults = dict(
     epochs=10,
 )
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+accelerator = "cpu"
+if torch.cuda.is_available():
+    accelerator = "cuda"
+elif torch.backends.mps.is_available():
+    accelerator = "mps"
+
+device = torch.device(accelerator)
 
 
 class Config:
@@ -36,10 +42,16 @@ def preprocess_logits_for_metrics(logits, labels):
 
 def prepare_dataset(tokenizer: RobertaTokenizer, preprocess) -> DatasetDict:
     dataset = load_dataset("mamiksik/CommitDiffs", use_auth_token=True)
+    # dataset = DatasetDict({
+    #     "train": Dataset.from_dict(dataset["train"][:10]),
+    #     "valid": Dataset.from_dict(dataset["valid"][:10]),
+    # })
+
     tokenized_datasets = dataset.map(
         lambda x: preprocess(tokenizer, x),
         batched=True,
-        remove_columns=["message", "patch"],
+        remove_columns=["message", "patch", "language"],
+        num_proc=1,
     )
     tokenized_datasets.set_format("torch")
     return tokenized_datasets
