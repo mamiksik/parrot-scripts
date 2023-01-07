@@ -56,11 +56,13 @@ def preprocess(tokenizer: RobertaTokenizer, examples):
 
 
 class CodeT5(pl.LightningModule):
-    def __init__(self, *, dataset, lr=5e-5, num_train_epochs=15, warmup_steps=1000):
+    def __init__(self, *, dataset, tokenizer: RobertaTokenizer, lr=5e-5, num_train_epochs=15, warmup_steps=1000):
         super().__init__()
         self.model = T5ForConditionalGeneration.from_pretrained(
             "Salesforce/codet5-small"
         )
+        self.model.resize_token_embeddings(len(tokenizer))
+
         self.dataset = dataset
         self.save_hyperparameters()
 
@@ -135,7 +137,7 @@ def main():
     dataset = prepare_dataset(tokenizer, preprocess)
 
     dataset.set_format(type="torch", columns=["input_ids", "attention_mask", "labels"])
-    model = CodeT5(dataset=dataset)
+    model = CodeT5(dataset=dataset, tokenizer=tokenizer)
 
     early_stop_callback = EarlyStopping(
         monitor="validation_loss", patience=3, strict=False, verbose=False, mode="min"
