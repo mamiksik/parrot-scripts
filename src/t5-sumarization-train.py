@@ -1,46 +1,17 @@
 import evaluate
-import nltk as nltk
 import numpy as np
-from datasets import DatasetDict, Dataset
 
 import wandb
 
 from transformers import (
     RobertaTokenizer,
-    TrainingArguments,
-    Trainer,
     T5ForConditionalGeneration,
     DataCollatorForSeq2Seq, EarlyStoppingCallback, Seq2SeqTrainingArguments, Seq2SeqTrainer,
 )
 
-from utils import Config, hyperparameter_defaults, prepare_dataset, device, preprocess_logits_for_metrics
+from utils import Config, hyperparameter_defaults, prepare_dataset, device, preprocess_logits_for_metrics, preprocess_t5
 
 wandb.init(config=hyperparameter_defaults, project="CommitPredictorT5")
-
-
-def preprocess(tokenizer: RobertaTokenizer, examples):
-
-    patch = [f"summarize:\n{patch}" for patch in examples["patch"]]
-    model_inputs = tokenizer(
-        patch, max_length=412, padding="max_length", truncation=True
-    )
-
-    with tokenizer.as_target_tokenizer():
-        labels = tokenizer(
-            text_target=examples["message"],
-            max_length=100,
-            padding="max_length",
-            truncation=True,
-        ).input_ids
-
-    labels_with_ignore_index = []
-    for labels_example in labels:
-        labels_example = [label if label != 0 else -100 for label in labels_example]
-        labels_with_ignore_index.append(labels_example)
-
-    model_inputs["labels"] = labels_with_ignore_index
-
-    return model_inputs
 
 
 def compute_metrics(metrics, tokenizer, eval_pred):
@@ -51,25 +22,7 @@ def compute_metrics(metrics, tokenizer, eval_pred):
     decoded_preds = tokenizer.batch_decode(predictions, skip_special_tokens=True)
     decoded_labels = tokenizer.batch_decode(labels, skip_special_tokens=True)
 
-    # Rouge expects a newline after each sentence
-    decoded_preds = [
-        "\n".join(nltk.sent_tokenize(pred.strip())) for pred in decoded_preds
-    ]
-    decoded_labels = [
-        "\n".join(nltk.sent_tokenize(label.strip())) for label in decoded_labels
-    ]
-
-    result = metrics['rouge'].compute(
-        predictions=decoded_preds, references=decoded_labels, use_stemmer=True
-    )
-
-    # Add mean generated length
-    prediction_lens = [np.count_nonzero(pred != tokenizer.pad_token_id) for pred in predictions]
-    result["gen_len"] = np.mean(prediction_lens)
-
-    output = {k: round(v, 4) for k, v in result.items()}
-    output['bleu'] = metrics['bleu4'].compute(predictions=decoded_preds, references=decoded_labels, smooth=True)["bleu"]
-    return output
+    return metrics['bleu4'].compute(predictions=decoded_preds, references=decoded_labels, smooth=True)["bleu"]
 
 
 def load_model_and_tokenizer(model_name: str, tokenizer_name: str):
@@ -77,16 +30,17 @@ def load_model_and_tokenizer(model_name: str, tokenizer_name: str):
     model.to(device)
 
     tokenizer = RobertaTokenizer.from_pretrained(tokenizer_name)
-    tokenizer.add_tokens(["<keep>", "<add>", "<remove>"], special_tokens=True)
+    tokenizer.add_tokens(["<ide>", "<add>", "<del>"], special_tokens=True)
     model.resize_token_embeddings(len(tokenizer))
+
     return model, tokenizer
 
 
 def main():
-    tokenizer_name = "Salesforce/codet5-base"
+    tokenizer_name = "Salesforce/codet5-base-multi-sum"
     model_name = "Salesforce/codet5-base-multi-sum"
 
-    model_output_path = Config.MODEL_CHECKPOINT_BASE_PATH / wandb.run.name
+    model_output_path = Config.MODEL_CHECKPOINT_BASE_PATH / 't5-hf'
     print(f"▶️  Model name: {model_name}")
     print(f"▶️  Output path: {str(model_output_path)}")
 
@@ -95,20 +49,14 @@ def main():
 
     print(f"ℹ️  Loading Metrics")
     metrics = {
-        'rouge': evaluate.load("rouge"),
         'bleu4': evaluate.load("bleu")
     }
 
     print(f"ℹ️  Loading Dataset")
-    tokenized_dataset = prepare_dataset(tokenizer, preprocess)
-
-    # tokenized_dataset = DatasetDict({
-    #     "train": Dataset.from_dict(tokenized_dataset["train"][:2]),
-    #     "test": Dataset.from_dict(tokenized_dataset["test"][:2]),
-    # })
+    tokenized_dataset = prepare_dataset(tokenizer, preprocess_t5)
+    tokenized_dataset.set_format(type="torch", columns=["input_ids", "attention_mask", "labels"])
 
     print(f"ℹ️  Initializing Trainer")
-    #
     data_collator = DataCollatorForSeq2Seq(tokenizer, model=model)
 
     training_args = Seq2SeqTrainingArguments(
@@ -124,36 +72,35 @@ def main():
         evaluation_strategy="epoch",
         save_total_limit=50,
 
-        learning_rate=wandb.config["learning_rate"],
-        weight_decay=wandb.config["weight_decay"],
+        learning_rate=2e-5,
+        weight_decay=0.01,
 
-        per_device_train_batch_size=16,
-        per_device_eval_batch_size=16,
+        per_device_train_batch_size=21,
+        per_device_eval_batch_size=21,
+        gradient_accumulation_steps=3,
 
-        num_train_epochs=100,
         bf16=True,
-        metric_for_best_model="eval_bleu",
-
+        num_train_epochs=100,
+        metric_for_best_model="eval_loss",
         predict_with_generate=True,
-        # auto_find_batch_size=True,
     )
 
     trainer = Seq2SeqTrainer(
         model=model,
         args=training_args,
         train_dataset=tokenized_dataset["train"],
-        eval_dataset=tokenized_dataset["test"],
+        eval_dataset=tokenized_dataset["valid"],
         compute_metrics=lambda eval_pred: compute_metrics(metrics, tokenizer, eval_pred),
         preprocess_logits_for_metrics=preprocess_logits_for_metrics,
         data_collator=data_collator,
-        callbacks=[EarlyStoppingCallback(early_stopping_patience=15)],
+        callbacks=[EarlyStoppingCallback(early_stopping_patience=3)],
     )
 
     print(f"🏋️‍♂️  Training")
     trainer.train()
 
     print(f"🚀  Pushing model to HuggingFace Hub")
-    commit_id = trainer.push_to_hub(f"End of training (patience=15, prefix=summarize) {wandb.run.name}", blocking=True)
+    commit_id = trainer.push_to_hub(f"End of training {wandb.run.name}", blocking=True)
     print(f"🎉  Model pushed to HuggingFace Hub: {commit_id}")
 
     print(f"🏁  Training Done")

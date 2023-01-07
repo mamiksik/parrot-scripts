@@ -57,6 +57,42 @@ def prepare_dataset(tokenizer: RobertaTokenizer, preprocess) -> DatasetDict:
     return tokenized_datasets
 
 
+def preprocess_t5(tokenizer: RobertaTokenizer, examples):
+    max_input_length = 256
+    max_target_length = 128
+
+    # encode the code-docstring pairs
+    language = examples["language"]
+    patch = np.array(examples["patch"])
+    commit_message = np.array(examples["message"])
+
+    ii = np.where(commit_message == None)[0]
+    commit_message = np.delete(commit_message, ii)
+    patch = np.delete(patch, ii)
+
+    inputs = [f"Summarize {lang}: " + code for lang, code in zip(language, patch)]
+    model_inputs = tokenizer(inputs, max_length=max_input_length, padding="max_length", truncation=True)
+
+    # Encode the summaries
+    labels = tokenizer(
+        list(commit_message),
+        max_length=max_target_length,
+        padding="max_length",
+        truncation=True,
+    ).input_ids
+
+    # important: we need to replace the index of the padding tokens by -100
+    # such that they are not taken into account by the CrossEntropyLoss
+    labels_with_ignore_index = []
+    for labels_example in labels:
+        labels_example = [label if label != 0 else -100 for label in labels_example]
+        labels_with_ignore_index.append(labels_example)
+
+    model_inputs["labels"] = labels_with_ignore_index
+
+    return model_inputs
+
+
 def predict_commit(pipe, message, length, n_beams=7):
     beams_prob = [0.0, 0.0]
     text = message + f' </s></s> <msg>' + ' <mask>' * length  # so that last dim still predicts
