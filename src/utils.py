@@ -51,7 +51,7 @@ def prepare_dataset(tokenizer: RobertaTokenizer, preprocess) -> DatasetDict:
         lambda x: preprocess(tokenizer, x),
         batched=True,
         remove_columns=["message", "patch", "language"],
-        num_proc=1,
+        num_proc=4,
     )
     tokenized_datasets.set_format("torch")
     return tokenized_datasets
