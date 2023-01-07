@@ -128,7 +128,7 @@ class CodeT5(pl.LightningModule):
 
 
 def main():
-    model_output_path = Config.MODEL_CHECKPOINT_BASE_PATH / 't5-pl'
+    model_output_path = Config.MODEL_CHECKPOINT_BASE_PATH / 't5-pl-large'
     wandb_logger = WandbLogger(project="CommitPredictorT5PL")
     print(f"🚨 Running on {accelerator}")
 
