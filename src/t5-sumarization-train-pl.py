@@ -59,7 +59,7 @@ class CodeT5(pl.LightningModule):
     def __init__(self, *, dataset, tokenizer: RobertaTokenizer, lr=5e-5, num_train_epochs=15, warmup_steps=1000):
         super().__init__()
         self.model = T5ForConditionalGeneration.from_pretrained(
-            "Salesforce/codet5-large"
+            "Salesforce/codet5-multi-sum"
         )
         self.model.resize_token_embeddings(len(tokenizer))
 
@@ -128,11 +128,11 @@ class CodeT5(pl.LightningModule):
 
 
 def main():
-    model_output_path = Config.MODEL_CHECKPOINT_BASE_PATH / 't5-pl-large'
-    wandb_logger = WandbLogger(project="CommitPredictorT5PL")
+    model_output_path = Config.MODEL_CHECKPOINT_BASE_PATH / 't5-pl-multi-sum'
+    wandb_logger = WandbLogger(project="CommitPredictorT5PL", name="t5-pl-multi-sum-better-dataset")
     print(f"🚨 Running on {accelerator}")
 
-    tokenizer = RobertaTokenizer.from_pretrained("Salesforce/codet5-large")
+    tokenizer = RobertaTokenizer.from_pretrained("Salesforce/codet5-multi-sum")
     tokenizer.add_tokens(["<ide>", "<add>", "<del>"], special_tokens=True)
     dataset = prepare_dataset(tokenizer, preprocess)
 

@@ -22,7 +22,7 @@ def compute_metrics(metrics, tokenizer, eval_pred):
     decoded_preds = tokenizer.batch_decode(predictions, skip_special_tokens=True)
     decoded_labels = tokenizer.batch_decode(labels, skip_special_tokens=True)
 
-    return metrics['bleu4'].compute(predictions=decoded_preds, references=decoded_labels, smooth=True)
+    return metrics['bleu4'].compute(predictions=decoded_preds, references=decoded_labels, tokenizer=tokenizer, smooth=True)
 
 
 def load_model_and_tokenizer(model_name: str, tokenizer_name: str):
