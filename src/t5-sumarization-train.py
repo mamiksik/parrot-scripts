@@ -6,10 +6,20 @@ import wandb
 from transformers import (
     RobertaTokenizer,
     T5ForConditionalGeneration,
-    DataCollatorForSeq2Seq, EarlyStoppingCallback, Seq2SeqTrainingArguments, Seq2SeqTrainer,
+    DataCollatorForSeq2Seq,
+    EarlyStoppingCallback,
+    Seq2SeqTrainingArguments,
+    Seq2SeqTrainer,
 )
 
-from utils import Config, hyperparameter_defaults, prepare_dataset, device, preprocess_logits_for_metrics, preprocess_t5
+from utils import (
+    Config,
+    hyperparameter_defaults,
+    prepare_dataset,
+    device,
+    preprocess_logits_for_metrics,
+    preprocess_t5,
+)
 
 HUB_ID = "CommitPredictorT5"
 wandb.init(config=hyperparameter_defaults, project="CommitPredictorT5")
@@ -50,7 +60,9 @@ def compute_metrics(metrics, tokenizer, eval_pred):
     decoded_preds = tokenizer.batch_decode(predictions, skip_special_tokens=True)
     decoded_labels = tokenizer.batch_decode(labels, skip_special_tokens=True)
 
-    return metrics.compute(predictions=decoded_preds, references=decoded_labels, smooth=True)
+    return metrics.compute(
+        predictions=decoded_preds, references=decoded_labels, smooth=True
+    )
 
 
 def load_model_and_tokenizer(model_name: str, tokenizer_name: str):
@@ -68,7 +80,7 @@ def main():
     tokenizer_name = "Salesforce/codet5-base-multi-sum"
     model_name = "Salesforce/codet5-base-multi-sum"
 
-    model_output_path = Config.MODEL_CHECKPOINT_BASE_PATH / 't5-hf'
+    model_output_path = Config.MODEL_CHECKPOINT_BASE_PATH / "t5-hf"
     print(f"▶️  Model name: {model_name}")
     print(f"▶️  Output path: {str(model_output_path)}")
 
@@ -80,7 +92,9 @@ def main():
 
     print(f"ℹ️  Loading Dataset")
     tokenized_dataset = prepare_dataset(tokenizer, preprocess)
-    tokenized_dataset.set_format(type="torch", columns=["input_ids", "attention_mask", "labels"])
+    tokenized_dataset.set_format(
+        type="torch", columns=["input_ids", "attention_mask", "labels"]
+    )
 
     print(f"ℹ️  Initializing Trainer")
     data_collator = DataCollatorForSeq2Seq(tokenizer, model=model)
@@ -93,18 +107,14 @@ def main():
         hub_strategy="end",
         overwrite_output_dir=True,
         load_best_model_at_end=True,
-
         save_strategy="epoch",
         evaluation_strategy="epoch",
         save_total_limit=50,
-
         learning_rate=4e-5,
         weight_decay=0.01,
-
         per_device_train_batch_size=21,
         per_device_eval_batch_size=21,
         gradient_accumulation_steps=3,
-
         bf16=True,
         num_train_epochs=100,
         metric_for_best_model="eval_loss",
@@ -116,7 +126,9 @@ def main():
         args=training_args,
         train_dataset=tokenized_dataset["train"],
         eval_dataset=tokenized_dataset["valid"],
-        compute_metrics=lambda eval_pred: compute_metrics(metrics, tokenizer, eval_pred),
+        compute_metrics=lambda eval_pred: compute_metrics(
+            metrics, tokenizer, eval_pred
+        ),
         data_collator=data_collator,
         callbacks=[EarlyStoppingCallback(early_stopping_patience=3)],
     )

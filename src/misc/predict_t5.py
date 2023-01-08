@@ -3,7 +3,7 @@ from transformers import T5ForConditionalGeneration, RobertaTokenizer
 
 
 def main():
-    model_path = '../../output-model/t5-pl'
+    model_path = "../../output-model/t5-pl"
     tokenizer = RobertaTokenizer.from_pretrained("Salesforce/codet5-small")
     tokenizer.add_tokens(["<ide>", "<add>", "<del>"], special_tokens=True)
 
@@ -12,11 +12,16 @@ def main():
 
     test_example = dataset["test"][70]
 
-    input_ids = tokenizer(f"Summarize {test_example['language']}:" + test_example['patch'], return_tensors='pt').input_ids
+    input_ids = tokenizer(
+        f"Summarize {test_example['language']}:" + test_example["patch"],
+        return_tensors="pt",
+    ).input_ids
     outputs = model.generate(input_ids)
-    print("Input:", test_example['patch'])
-    print("Commit message:", test_example['message'])
-    print("Generated docstring:", tokenizer.decode(outputs[0], skip_special_tokens=True))
+    print("Input:", test_example["patch"])
+    print("Commit message:", test_example["message"])
+    print(
+        "Generated docstring:", tokenizer.decode(outputs[0], skip_special_tokens=True)
+    )
 
 
 if __name__ == "__main__":

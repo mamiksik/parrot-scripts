@@ -4,7 +4,11 @@ import evaluate
 import numpy as np
 import torch
 from datasets import Dataset, DatasetDict
-from transformers.data.data_collator import _torch_collate_batch, tf_default_data_collator, torch_default_data_collator
+from transformers.data.data_collator import (
+    _torch_collate_batch,
+    tf_default_data_collator,
+    torch_default_data_collator,
+)
 
 import wandb
 
@@ -24,7 +28,7 @@ from utils import (
     hyperparameter_defaults,
     prepare_dataset,
     device,
-    accelerator
+    accelerator,
 )
 
 wandb.init(config=hyperparameter_defaults, project="CommitPredictor")
@@ -33,8 +37,10 @@ wandb.init(config=hyperparameter_defaults, project="CommitPredictor")
 def preprocess(tokenizer: RobertaTokenizer, examples):
     messages = [f"<msg> {message}" for message in examples["message"]]
     inputs = tokenizer(
-        examples["patch"], messages, padding="max_length", truncation="only_first",
-
+        examples["patch"],
+        messages,
+        padding="max_length",
+        truncation="only_first",
         # https://github.com/neulab/code-bert-score/blob/main/run_mlm.py#L448
         # We use this option because DataCollatorForLanguageModeling (see below) is more efficient when it
         # receives the `special_tokens_mask`.
@@ -43,7 +49,7 @@ def preprocess(tokenizer: RobertaTokenizer, examples):
 
     masking_mask = []
     for input_ids in inputs["input_ids"]:
-        start_msg_index = input_ids.index(tokenizer.sep_token_id) + 3 # </s></s><msg>
+        start_msg_index = input_ids.index(tokenizer.sep_token_id) + 3  # </s></s><msg>
         try:
             end_msg_index = input_ids.index(tokenizer.pad_token_id)
         except ValueError:
@@ -88,7 +94,9 @@ def compute_metrics(metric, eval_pred):
     preds = preds[mask]
 
     return {
-        'accuracy': metric['accuracy'].compute(predictions=preds, references=labels)['accuracy']
+        "accuracy": metric["accuracy"].compute(predictions=preds, references=labels)[
+            "accuracy"
+        ]
     }
 
 
@@ -112,11 +120,17 @@ def msg_masking_collator(tokenizer, features: list[list[int] | Any | dict[str, A
     labels[~masked_indices] = -100  # We only compute loss on masked tokens
 
     # 80% of the time, we replace masked input tokens with tokenizer.mask_token ([MASK])
-    indices_replaced = torch.bernoulli(torch.full(labels.shape, 0.8)).bool() & masked_indices
+    indices_replaced = (
+        torch.bernoulli(torch.full(labels.shape, 0.8)).bool() & masked_indices
+    )
     inputs[indices_replaced] = tokenizer.convert_tokens_to_ids(tokenizer.mask_token)
 
     # 10% of the time, we replace masked input tokens with random word
-    indices_random = torch.bernoulli(torch.full(labels.shape, 0.5)).bool() & masked_indices & ~indices_replaced
+    indices_random = (
+        torch.bernoulli(torch.full(labels.shape, 0.5)).bool()
+        & masked_indices
+        & ~indices_replaced
+    )
     random_words = torch.randint(len(tokenizer), labels.shape, dtype=torch.long)
     inputs[indices_random] = random_words[indices_random]
 
@@ -129,7 +143,7 @@ def msg_masking_collator(tokenizer, features: list[list[int] | Any | dict[str, A
 
 def main():
     model_name = "microsoft/codebert-base-mlm"
-    model_output_path = Config.MODEL_CHECKPOINT_BASE_PATH / 'mlm'
+    model_output_path = Config.MODEL_CHECKPOINT_BASE_PATH / "mlm"
     print(f"▶️  Model name: {model_name}")
     print(f"▶️  Output path: {str(model_output_path)}")
 
@@ -139,9 +153,7 @@ def main():
     )
 
     print(f"ℹ️  Loading Metrics")
-    metric = {
-        'accuracy': evaluate.load("accuracy")
-    }
+    metric = {"accuracy": evaluate.load("accuracy")}
 
     print(f"ℹ️  Loading Dataset")
     tokenized_dataset = prepare_dataset(tokenizer, preprocess)
@@ -164,14 +176,11 @@ def main():
         save_total_limit=50,
         learning_rate=wandb.config["learning_rate"],
         weight_decay=wandb.config["weight_decay"],
-
         # metric_for_best_model='eval_bleu4',
         num_train_epochs=50,
-
         fp16=accelerator == "cuda",
         per_device_train_batch_size=21,
         per_device_eval_batch_size=21,
-
         gradient_accumulation_steps=3,
         remove_unused_columns=False,
     )

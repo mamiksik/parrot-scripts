@@ -5,8 +5,16 @@ from pathlib import Path
 import evaluate
 import wandb
 from datasets import Dataset
-from transformers import pipeline, RobertaTokenizer, RobertaForMaskedLM, Pipeline, DefaultFlowCallback, \
-    TrainingArguments, TrainerState, TrainerControl
+from transformers import (
+    pipeline,
+    RobertaTokenizer,
+    RobertaForMaskedLM,
+    Pipeline,
+    DefaultFlowCallback,
+    TrainingArguments,
+    TrainerState,
+    TrainerControl,
+)
 from wandb.apis.public import Run
 
 from utils import predict_commit
@@ -30,14 +38,20 @@ class AsyncBleu4Callback(DefaultFlowCallback):
         self.run = run
         self.eval_dataset = eval_dataset
 
-    def on_evaluate(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, **kwargs):
+    def on_evaluate(
+        self,
+        args: TrainingArguments,
+        state: TrainerState,
+        control: TrainerControl,
+        **kwargs
+    ):
         checkpoint = CheckpointDescription(
             output_dir=Path(args.output_dir),
             checkpoint_name=state.trial_name,
             run=self.run,
-            eval_dataset=self.eval_dataset
+            eval_dataset=self.eval_dataset,
         )
-        self.pool.apply_async(evaluate_worker, (checkpoint, ))
+        self.pool.apply_async(evaluate_worker, (checkpoint,))
 
     def __enter__(self):
         self.pool = Pool(processes=2)
@@ -48,7 +62,9 @@ class AsyncBleu4Callback(DefaultFlowCallback):
 
 
 def evaluate_worker(checkpoint: CheckpointDescription):
-    model = RobertaForMaskedLM.from_pretrained(checkpoint.output_dir / checkpoint.checkpoint_name)
+    model = RobertaForMaskedLM.from_pretrained(
+        checkpoint.output_dir / checkpoint.checkpoint_name
+    )
     tokenizer = RobertaTokenizer.from_pretrained(checkpoint.output_dir)
     metric = evaluate.load("bleu")
 
@@ -63,11 +79,10 @@ def evaluate_worker(checkpoint: CheckpointDescription):
         ground_truth.append(message)
         predictions.append(predict_commit(pipe, message, patch)[0])
 
-    bleu = metric.compute(predictions=predictions, references=ground_truth, smooth=True)["bleu"]
+    bleu = metric.compute(
+        predictions=predictions, references=ground_truth, smooth=True
+    )["bleu"]
 
-    checkpoint.run.log({"bleu4": bleu},)
-
-
-
-
-
+    checkpoint.run.log(
+        {"bleu4": bleu},
+    )

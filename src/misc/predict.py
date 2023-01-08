@@ -51,31 +51,35 @@ def predict(tokenizer, model, text):
 
 
 def main():
-    path = '/home/dron/work/temp/BscModel/output-model/mlm/checkpoint-2260-best-bleu'
-    path = '/home/dron/work/temp/BscModel/output-model/mlm/checkpoint-452'
-    path = '/home/dron/work/temp/BscModel/output-model/mlm/checkpoint-3164'
-    path = '/home/dron/work/temp/BscModel/output-model/mlm/checkpoint-1356'
+    path = "/home/dron/work/temp/BscModel/output-model/mlm/checkpoint-2260-best-bleu"
+    path = "/home/dron/work/temp/BscModel/output-model/mlm/checkpoint-452"
+    path = "/home/dron/work/temp/BscModel/output-model/mlm/checkpoint-3164"
+    path = "/home/dron/work/temp/BscModel/output-model/mlm/checkpoint-1356"
     path = "mamiksik/CommitPredictor"
 
     model = RobertaForMaskedLM.from_pretrained(path, revision="c653c13")
     # path = '/home/dron/work/temp/BscModel/output-model/mlm/'
-    tokenizer = RobertaTokenizer.from_pretrained(path, revision="c653c13", truncation=True)
+    tokenizer = RobertaTokenizer.from_pretrained(
+        path, revision="c653c13", truncation=True
+    )
 
     # Create a torch.device object for the GPU
     # gpu_index = torch.cuda.current_device()
     # device = torch.device("cuda:" + str(gpu_index))
-    device = 'cpu'
+    device = "cpu"
     # device = torch.device("mps")
     pipe = pipeline("fill-mask", model=model, tokenizer=tokenizer, device=device)
 
     dataset = load_dataset("mamiksik/CommitDiffs", use_auth_token=False)
-    df = pd.DataFrame.from_dict(dataset['train'])
+    df = pd.DataFrame.from_dict(dataset["train"])
     print(df)
 
-    message = "<keep>def main():" '<keep>   print("Hello World!")' '<remove>   name = "John"'
+    message = (
+        "<keep>def main():" '<keep>   print("Hello World!")' '<remove>   name = "John"'
+    )
     length = 20
 
-    text = message + f' </s></s> <msg>' + ' <mask>' * length
+    text = message + f" </s></s> <msg>" + " <mask>" * length
 
     n_beams = 7
     best_n_results = 4
@@ -85,17 +89,23 @@ def main():
         commits = []
         print(f'\nPatch: \n{"=" * 70}\n{patch[:1000]}\n{"=" * 70}\n')
         for len_multiplier in len_multipliers:
-            commits += predict_commit(pipe, patch, int(length * len_multiplier), n_beams)[:best_n_results]
+            commits += predict_commit(
+                pipe, patch, int(length * len_multiplier), n_beams
+            )[:best_n_results]
         # person_message = input()
-        print(f'\nCommit: {message}')
+        print(f"\nCommit: {message}")
         pprint(commits)
         print()
 
 
 def predict_commit(pipe, message, length, n_beams=7):
     beams_prob = [0.0, 0.0]
-    text = message + f' </s></s> <msg>' + ' <mask>' * length  # so that last dim still predicts
-    beams = [text, ] * 2
+    text = (
+        message + f" </s></s> <msg>" + " <mask>" * length
+    )  # so that last dim still predicts
+    beams = [
+        text,
+    ] * 2
     for i in range(length):
         beams = beams[:n_beams]
         beams_prob = beams_prob[:n_beams]
@@ -110,14 +120,18 @@ def predict_commit(pipe, message, length, n_beams=7):
         new_beams = []
         new_beams_prob = []
         for beam_prob, input_result in zip(beams_prob, r):
-            for prediction in input_result if last_mask else input_result[0]:  # only 1st mask
-                if last_mask:   # Avoid overcompensating branches where last token is obvisous (period etc.)
-                    new_beams.append(prediction['sequence'])
+            for prediction in (
+                input_result if last_mask else input_result[0]
+            ):  # only 1st mask
+                if (
+                    last_mask
+                ):  # Avoid overcompensating branches where last token is obvisous (period etc.)
+                    new_beams.append(prediction["sequence"])
                     new_beams_prob.append(beam_prob)
-                    break   # add only the most probable last word
+                    break  # add only the most probable last word
                 else:
-                    new_beams_prob.append(beam_prob + log(prediction['score']))
-                    new_beams.append(prediction['sequence'][4:-4])
+                    new_beams_prob.append(beam_prob + log(prediction["score"]))
+                    new_beams.append(prediction["sequence"][4:-4])
 
         beams = np.array(new_beams)[np.argsort(new_beams_prob)][::-1]
         beams_prob = np.sort(new_beams_prob)[::-1]  # TODO: check correct sorting

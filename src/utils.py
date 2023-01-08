@@ -42,10 +42,6 @@ def preprocess_logits_for_metrics(logits, labels):
 
 def prepare_dataset(tokenizer: RobertaTokenizer, preprocess) -> DatasetDict:
     dataset = load_dataset("mamiksik/CommitDiffs", use_auth_token=True)
-    # dataset = DatasetDict({
-    #     "train": Dataset.from_dict(dataset["train"][:2]),
-    #     "valid": Dataset.from_dict(dataset["valid"][:2]),
-    # })
 
     tokenized_datasets = dataset.map(
         lambda x: preprocess(tokenizer, x),
@@ -71,7 +67,9 @@ def preprocess_t5(tokenizer: RobertaTokenizer, examples):
     patch = np.delete(patch, ii)
 
     inputs = [f"Summarize {lang}: " + code for lang, code in zip(language, patch)]
-    model_inputs = tokenizer(inputs, max_length=max_input_length, padding="max_length", truncation=True)
+    model_inputs = tokenizer(
+        inputs, max_length=max_input_length, padding="max_length", truncation=True
+    )
 
     # Encode the summaries
     labels = tokenizer(
@@ -95,8 +93,12 @@ def preprocess_t5(tokenizer: RobertaTokenizer, examples):
 
 def predict_commit(pipe, message, length, n_beams=7):
     beams_prob = [0.0, 0.0]
-    text = message + f' </s></s> <msg>' + ' <mask>' * length  # so that last dim still predicts
-    beams = [text, ] * 2
+    text = (
+        message + f" </s></s> <msg>" + " <mask>" * length
+    )  # so that last dim still predicts
+    beams = [
+        text,
+    ] * 2
     for i in range(length):
         beams = beams[:n_beams]
         beams_prob = beams_prob[:n_beams]
@@ -111,14 +113,18 @@ def predict_commit(pipe, message, length, n_beams=7):
         new_beams = []
         new_beams_prob = []
         for beam_prob, input_result in zip(beams_prob, r):
-            for prediction in input_result if last_mask else input_result[0]:  # only 1st mask
-                if last_mask:   # Avoid overcompensating branches where last token is obvisous (period etc.)
-                    new_beams.append(prediction['sequence'])
+            for prediction in (
+                input_result if last_mask else input_result[0]
+            ):  # only 1st mask
+                if (
+                    last_mask
+                ):  # Avoid overcompensating branches where last token is obvisous (period etc.)
+                    new_beams.append(prediction["sequence"])
                     new_beams_prob.append(beam_prob)
-                    break   # add only the most probable last word
+                    break  # add only the most probable last word
                 else:
-                    new_beams_prob.append(beam_prob + log(prediction['score']))
-                    new_beams.append(prediction['sequence'][4:-4])
+                    new_beams_prob.append(beam_prob + log(prediction["score"]))
+                    new_beams.append(prediction["sequence"][4:-4])
 
         beams = np.array(new_beams)[np.argsort(new_beams_prob)][::-1]
         beams_prob = np.sort(new_beams_prob)[::-1]  # TODO: check correct sorting

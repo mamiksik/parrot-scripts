@@ -9,7 +9,11 @@ from transformers import (
     TrainingArguments,
     Trainer,
     DataCollatorForLanguageModeling,
-    RobertaForCausalLM, EarlyStoppingCallback, RobertaConfig, Seq2SeqTrainer, Seq2SeqTrainingArguments,
+    RobertaForCausalLM,
+    EarlyStoppingCallback,
+    RobertaConfig,
+    Seq2SeqTrainer,
+    Seq2SeqTrainingArguments,
 )
 
 from utils import (
@@ -66,9 +70,15 @@ def compute_metrics(tokenizer, metric, eval_pred):
     decoded_labels = tokenizer.batch_decode(labels, skip_special_tokens=True)
 
     return {
-        'accuracy': metric['accuracy'].compute(predictions=preds, references=labels)['accuracy'],
-        'f1': metric['f1'].compute(predictions=preds, references=labels, average='micro')['f1'],
-        'bleu4': metric['bleu4'].compute(predictions=decoded_preds, references=decoded_labels, smooth=True)["bleu"],
+        "accuracy": metric["accuracy"].compute(predictions=preds, references=labels)[
+            "accuracy"
+        ],
+        "f1": metric["f1"].compute(
+            predictions=preds, references=labels, average="micro"
+        )["f1"],
+        "bleu4": metric["bleu4"].compute(
+            predictions=decoded_preds, references=decoded_labels, smooth=True
+        )["bleu"],
     }
 
 
@@ -85,9 +95,9 @@ def main():
 
     print(f"ℹ️  Loading Metrics")
     metric = {
-        'accuracy': evaluate.load("accuracy"),
-        'f1': evaluate.load("f1"),
-        'bleu4': evaluate.load("bleu"),
+        "accuracy": evaluate.load("accuracy"),
+        "f1": evaluate.load("f1"),
+        "bleu4": evaluate.load("bleu"),
     }
 
     print(f"ℹ️  Loading Dataset")
@@ -98,9 +108,7 @@ def main():
     # })
 
     print(f"ℹ️  Initializing Trainer")
-    data_collator = DataCollatorForLanguageModeling(
-        tokenizer=tokenizer, mlm=False
-    )
+    data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False)
 
     training_args = TrainingArguments(
         output_dir=str(model_output_path),
@@ -109,17 +117,14 @@ def main():
         report_to=["wandb"],
         push_to_hub=True,
         hub_strategy="end",
-
         load_best_model_at_end=True,
         save_strategy="epoch",
         evaluation_strategy="epoch",
         save_total_limit=100,
-
         learning_rate=wandb.config["learning_rate"],
         weight_decay=wandb.config["weight_decay"],
         num_train_epochs=200,
-        metric_for_best_model='eval_bleu4',
-
+        metric_for_best_model="eval_bleu4",
         per_device_train_batch_size=16,
         per_device_eval_batch_size=16,
     )
@@ -139,7 +144,9 @@ def main():
     trainer.train()
 
     print(f"🚀  Pushing model to HuggingFace Hub")
-    commit_id = trainer.push_to_hub(f"End of training (Seq2SeqTraining) {wandb.run.name}", blocking=True)
+    commit_id = trainer.push_to_hub(
+        f"End of training (Seq2SeqTraining) {wandb.run.name}", blocking=True
+    )
     print(f"🎉  Model pushed to HuggingFace Hub: {commit_id}")
 
     print(f"🏁  Training Done")
