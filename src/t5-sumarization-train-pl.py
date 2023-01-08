@@ -82,7 +82,6 @@ class CodeT5(pl.LightningModule):
         )
         return outputs
 
-
     def training_step(self, batch, batch_idx):
         loss = self(**batch).loss
         self.log("training_loss", loss)
@@ -94,7 +93,8 @@ class CodeT5(pl.LightningModule):
         self.log("validation_loss", outputs.loss, on_epoch=True)
 
         predictions = self.tokenizer.batch_decode(outputs.logits.argmax(-1), skip_special_tokens=True)
-        targets = np.where(batch['labels'] != -100, batch['labels'], self.tokenizer.pad_token_id)
+        targets = batch['labels'].cpu()
+        targets = np.where(targets != -100, targets, self.tokenizer.pad_token_id)
         targets = self.tokenizer.batch_decode(targets, skip_special_tokens=True)
 
         self.targets.extend(targets)
