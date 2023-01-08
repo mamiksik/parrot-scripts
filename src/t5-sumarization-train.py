@@ -110,15 +110,17 @@ def main():
         save_strategy="epoch",
         evaluation_strategy="epoch",
         save_total_limit=50,
-        learning_rate=4e-5,
+        learning_rate=5e-5,
         weight_decay=0.01,
-        per_device_train_batch_size=8,
-        per_device_eval_batch_size=8,
+        per_device_train_batch_size=16,
+        per_device_eval_batch_size=16,
         gradient_accumulation_steps=3,
         bf16=True,
-        num_train_epochs=100,
+        num_train_epochs=15,
         metric_for_best_model="eval_loss",
         predict_with_generate=True,
+
+        warmup_steps=1000,  # From PL example
     )
 
     trainer = Seq2SeqTrainer(
