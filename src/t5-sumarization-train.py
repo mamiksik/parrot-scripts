@@ -11,7 +11,35 @@ from transformers import (
 
 from utils import Config, hyperparameter_defaults, prepare_dataset, device, preprocess_logits_for_metrics, preprocess_t5
 
+HUB_ID = "CommitPredictorT5"
 wandb.init(config=hyperparameter_defaults, project="CommitPredictorT5")
+
+
+def preprocess(tokenizer: RobertaTokenizer, examples):
+    max_input_length = 256
+    max_target_length = 128
+
+    # encode the code-docstring pairs
+    language = examples["language"]
+    patch = np.array(examples["patch"])
+    commit_message = np.array(examples["message"])
+
+    ii = np.where(commit_message == None)[0]
+    commit_message = np.delete(commit_message, ii)
+    patch = np.delete(patch, ii)
+
+    inputs = [f"Summarize {lang}: " + code for lang, code in zip(language, patch)]
+    model_inputs = tokenizer(inputs, max_length=max_input_length, truncation=True)
+
+    # Encode the summaries
+    labels = tokenizer(
+        list(commit_message),
+        max_length=max_target_length,
+        truncation=True,
+    ).input_ids
+
+    model_inputs["labels"] = labels
+    return model_inputs
 
 
 def compute_metrics(metrics, tokenizer, eval_pred):
@@ -22,7 +50,7 @@ def compute_metrics(metrics, tokenizer, eval_pred):
     decoded_preds = tokenizer.batch_decode(predictions, skip_special_tokens=True)
     decoded_labels = tokenizer.batch_decode(labels, skip_special_tokens=True)
 
-    return metrics['bleu4'].compute(predictions=decoded_preds, references=decoded_labels, tokenizer=tokenizer, smooth=True)
+    return metrics.compute(predictions=decoded_preds, references=decoded_labels, smooth=True)
 
 
 def load_model_and_tokenizer(model_name: str, tokenizer_name: str):
@@ -48,12 +76,10 @@ def main():
     model, tokenizer = load_model_and_tokenizer(model_name, tokenizer_name)
 
     print(f"ℹ️  Loading Metrics")
-    metrics = {
-        'bleu4': evaluate.load("bleu")
-    }
+    metrics = evaluate.load("bleu")
 
     print(f"ℹ️  Loading Dataset")
-    tokenized_dataset = prepare_dataset(tokenizer, preprocess_t5)
+    tokenized_dataset = prepare_dataset(tokenizer, preprocess)
     tokenized_dataset.set_format(type="torch", columns=["input_ids", "attention_mask", "labels"])
 
     print(f"ℹ️  Initializing Trainer")
@@ -61,7 +87,7 @@ def main():
 
     training_args = Seq2SeqTrainingArguments(
         output_dir=str(model_output_path),
-        hub_model_id="CommitPredictorT5",
+        hub_model_id=HUB_ID,
         report_to=["wandb"],
         push_to_hub=True,
         hub_strategy="end",
@@ -72,7 +98,7 @@ def main():
         evaluation_strategy="epoch",
         save_total_limit=50,
 
-        learning_rate=2e-5,
+        learning_rate=4e-5,
         weight_decay=0.01,
 
         per_device_train_batch_size=21,
@@ -91,7 +117,6 @@ def main():
         train_dataset=tokenized_dataset["train"],
         eval_dataset=tokenized_dataset["valid"],
         compute_metrics=lambda eval_pred: compute_metrics(metrics, tokenizer, eval_pred),
-        preprocess_logits_for_metrics=preprocess_logits_for_metrics,
         data_collator=data_collator,
         callbacks=[EarlyStoppingCallback(early_stopping_patience=3)],
     )
@@ -100,6 +125,7 @@ def main():
     trainer.train()
 
     print(f"🚀  Pushing model to HuggingFace Hub")
+    tokenizer.push_to_hub(repo_id=HUB_ID)
     commit_id = trainer.push_to_hub(f"End of training {wandb.run.name}", blocking=True)
     print(f"🎉  Model pushed to HuggingFace Hub: {commit_id}")
 

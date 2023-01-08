@@ -42,10 +42,10 @@ def preprocess_logits_for_metrics(logits, labels):
 
 def prepare_dataset(tokenizer: RobertaTokenizer, preprocess) -> DatasetDict:
     dataset = load_dataset("mamiksik/CommitDiffs", use_auth_token=True)
-    # dataset = DatasetDict({
-    #     "train": Dataset.from_dict(dataset["train"][:10]),
-    #     "valid": Dataset.from_dict(dataset["valid"][:10]),
-    # })
+    dataset = DatasetDict({
+        "train": Dataset.from_dict(dataset["train"][:2]),
+        "valid": Dataset.from_dict(dataset["valid"][:2]),
+    })
 
     tokenized_datasets = dataset.map(
         lambda x: preprocess(tokenizer, x),
