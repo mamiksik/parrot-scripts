@@ -143,7 +143,7 @@ class CodeT5(pl.LightningModule):
 
 
 def main():
-    model_output_path = Config.MODEL_CHECKPOINT_BASE_PATH / "t5-pl-logging"
+    model_output_path = Config.MODEL_CHECKPOINT_BASE_PATH / "t5-pl-hub"
     wandb_logger = WandbLogger(
         project="CommitPredictorT5PL", name="t5-pl-logging"
     )
@@ -171,6 +171,9 @@ def main():
 
     trainer.fit(model)
     model.model.save_pretrained(model_output_path)
+
+    new_model = T5ForConditionalGeneration.from_pretrained(model_output_path)
+    new_model.push_to_hub("CommitPredictorT5PL")
 
 
 if __name__ == "__main__":
