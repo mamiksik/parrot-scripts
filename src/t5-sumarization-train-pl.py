@@ -103,7 +103,7 @@ class CodeT5(pl.LightningModule):
 
     def validation_epoch_end(self, outputs):
         result = self.metrics.compute(predictions=self.predictions, references=self.targets, smooth=True)
-        self.log("bleu", result['bleu'])
+        self.log("eval/bleu", result['bleu'])
 
         self.targets.clear()
         self.predictions.clear()
