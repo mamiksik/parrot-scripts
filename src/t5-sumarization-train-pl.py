@@ -1,3 +1,4 @@
+import evaluate
 import numpy as np
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import EarlyStopping, LearningRateMonitor
@@ -12,9 +13,7 @@ from transformers import (
 import pytorch_lightning as pl
 
 import wandb
-from utils import hyperparameter_defaults, prepare_dataset, Config, accelerator
-
-# wandb.init(config=hyperparameter_defaults, project="CommitPredictorT5PL")
+from utils import prepare_dataset, Config, accelerator
 
 max_input_length = 256
 max_target_length = 128
@@ -66,13 +65,16 @@ class CodeT5(pl.LightningModule):
         warmup_steps=1000,
     ):
         super().__init__()
-        self.model = T5ForConditionalGeneration.from_pretrained(
-            "Salesforce/codet5-multi-sum"
-        )
+        self.model = T5ForConditionalGeneration.from_pretrained("Salesforce/codet5-base-multi-sum")
         self.model.resize_token_embeddings(len(tokenizer))
 
         self.dataset = dataset
+        self.tokenizer = tokenizer
         self.save_hyperparameters()
+
+        self.metrics = evaluate.load("bleu")
+        self.targets = []
+        self.predictions = []
 
     def forward(self, input_ids, attention_mask, labels=None):
         outputs = self.model(
@@ -80,29 +82,34 @@ class CodeT5(pl.LightningModule):
         )
         return outputs
 
-    def common_step(self, batch, batch_idx):
-        outputs = self(**batch)
-        loss = outputs.loss
-
-        return loss
 
     def training_step(self, batch, batch_idx):
-        loss = self.common_step(batch, batch_idx)
-        # logs metrics for each training_step,
-        # and the average across the epoch
+        loss = self(**batch).loss
         self.log("training_loss", loss)
 
         return loss
 
     def validation_step(self, batch, batch_idx):
-        loss = self.common_step(batch, batch_idx)
-        self.log("validation_loss", loss, on_epoch=True)
+        outputs = self(**batch)
+        self.log("validation_loss", outputs.loss, on_epoch=True)
 
-        return loss
+        predictions = self.tokenizer.batch_decode(outputs.logits.argmax(-1), skip_special_tokens=True)
+        targets = np.where(batch['labels'] != -100, batch['labels'], self.tokenizer.pad_token_id)
+        targets = self.tokenizer.batch_decode(targets, skip_special_tokens=True)
+
+        self.targets.extend(targets)
+        self.predictions.extend(predictions)
+        return outputs.loss
+
+    def validation_epoch_end(self, outputs):
+        result = self.metrics.compute(predictions=self.predictions, references=self.targets, smooth=True)
+        self.log("bleu", result['bleu'])
+
+        self.targets.clear()
+        self.predictions.clear()
 
     def test_step(self, batch, batch_idx):
-        loss = self.common_step(batch, batch_idx)
-
+        loss = self(**batch).loss
         return loss
 
     def configure_optimizers(self):
@@ -136,13 +143,13 @@ class CodeT5(pl.LightningModule):
 
 
 def main():
-    model_output_path = Config.MODEL_CHECKPOINT_BASE_PATH / "t5-pl-multi-sum"
+    model_output_path = Config.MODEL_CHECKPOINT_BASE_PATH / "t5-pl-logging"
     wandb_logger = WandbLogger(
-        project="CommitPredictorT5PL", name="t5-pl-multi-sum-better-dataset"
+        project="CommitPredictorT5PL", name="t5-pl-logging"
     )
     print(f"🚨 Running on {accelerator}")
 
-    tokenizer = RobertaTokenizer.from_pretrained("Salesforce/codet5-multi-sum")
+    tokenizer = RobertaTokenizer.from_pretrained("Salesforce/codet5-base-multi-sum")
     tokenizer.add_tokens(["<ide>", "<add>", "<del>"], special_tokens=True)
     dataset = prepare_dataset(tokenizer, preprocess)
 
@@ -155,7 +162,7 @@ def main():
     lr_monitor = LearningRateMonitor(logging_interval="step")
 
     trainer = Trainer(
-        accelerator=accelerator,
+        # accelerator=accelerator,
         precision=16,
         default_root_dir=model_output_path / "checkpoints",
         logger=wandb_logger,
