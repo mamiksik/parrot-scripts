@@ -162,7 +162,7 @@ def main():
     lr_monitor = LearningRateMonitor(logging_interval="step")
 
     trainer = Trainer(
-        # accelerator=accelerator,
+        accelerator=accelerator,
         precision=16,
         default_root_dir=model_output_path / "checkpoints",
         logger=wandb_logger,
