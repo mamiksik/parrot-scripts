@@ -145,7 +145,7 @@ class CodeT5(pl.LightningModule):
 def main():
     model_output_path = Config.MODEL_CHECKPOINT_BASE_PATH / "t5-pl-hub"
     wandb_logger = WandbLogger(
-        project="CommitPredictorT5PL", name="t5-pl-logging"
+        project="CommitPredictorT5PL", name="t5-pl-15-epoch"
     )
     print(f"🚨 Running on {accelerator}")
 
@@ -166,6 +166,7 @@ def main():
         precision=16,
         default_root_dir=model_output_path / "checkpoints",
         logger=wandb_logger,
+        min_epochs=15,
         callbacks=[early_stop_callback, lr_monitor],
     )
 
