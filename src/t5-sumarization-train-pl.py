@@ -133,19 +133,19 @@ class CodeT5(pl.LightningModule):
         return {"optimizer": optimizer, "lr_scheduler": lr_scheduler}
 
     def train_dataloader(self):
-        return DataLoader(self.dataset["train"], shuffle=True, batch_size=8)
+        return DataLoader(self.dataset["train"], shuffle=True, batch_size=16)
 
     def val_dataloader(self):
-        return DataLoader(self.dataset["valid"], batch_size=4)
+        return DataLoader(self.dataset["valid"], batch_size=8)
 
     def test_dataloader(self):
-        return DataLoader(self.dataset["test"], batch_size=4)
+        return DataLoader(self.dataset["test"], batch_size=8)
 
 
 def main():
     model_output_path = Config.MODEL_CHECKPOINT_BASE_PATH / "t5-pl-hub"
     wandb_logger = WandbLogger(
-        project="CommitPredictorT5PL", name="t5-pl-15-epoch"
+        project="CommitPredictorT5PL", name="t5-pl-larger-batch-size"
     )
     print(f"🚨 Running on {accelerator}")
 
@@ -159,6 +159,7 @@ def main():
     early_stop_callback = EarlyStopping(
         monitor="validation_loss", patience=3, strict=False, verbose=False, mode="min"
     )
+
     lr_monitor = LearningRateMonitor(logging_interval="step")
 
     trainer = Trainer(
@@ -166,8 +167,8 @@ def main():
         precision=16,
         default_root_dir=model_output_path / "checkpoints",
         logger=wandb_logger,
-        min_epochs=15,
         callbacks=[early_stop_callback, lr_monitor],
+        accumulate_grad_batches=3,
     )
 
     trainer.fit(model)
@@ -175,6 +176,7 @@ def main():
 
     new_model = T5ForConditionalGeneration.from_pretrained(model_output_path)
     new_model.push_to_hub("CommitPredictorT5PL")
+    tokenizer.push_to_hub("CommitPredictorT5PL")
 
 
 if __name__ == "__main__":
