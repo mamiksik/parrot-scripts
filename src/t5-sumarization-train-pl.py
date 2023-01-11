@@ -1,3 +1,5 @@
+from dataclasses import asdict
+
 import evaluate
 import numpy as np
 from pytorch_lightning import Trainer
@@ -12,44 +14,35 @@ from transformers import (
 )
 import pytorch_lightning as pl
 
-import wandb
-from utils import prepare_dataset, Config, accelerator
-
-max_input_length = 512
-max_target_length = 128
+from utils import prepare_dataset, Config, accelerator, RunArgs
 
 
-def preprocess(tokenizer: RobertaTokenizer, examples):
+def preprocess(training_args: RunArgs, tokenizer: RobertaTokenizer, examples):
     # encode the code-docstring pairs
-    language = examples["language"]
     patch = np.array(examples["patch"])
     commit_message = np.array(examples["message"])
 
+    # Some wired stuff with commit message being none
     ii = np.where(commit_message == None)[0]
     commit_message = np.delete(commit_message, ii)
     patch = np.delete(patch, ii)
 
-    inputs = [f"Summarize {lang}: " + code for lang, code in zip(language, patch)]
+    inputs = [code for code in patch]
     model_inputs = tokenizer(
-        inputs, max_length=max_input_length, padding="max_length", truncation=True
+        inputs, max_length=training_args.max_input_size, padding="max_length", truncation=True
     )
 
     # encode the summaries
     labels = tokenizer(
         list(commit_message),
-        max_length=max_target_length,
+        max_length=training_args.max_target_size,
         padding="max_length",
         truncation=True,
+        return_tensors='np'
     ).input_ids
 
-    # important: we need to replace the index of the padding tokens by -100
-    # such that they are not taken into account by the CrossEntropyLoss
-    labels_with_ignore_index = []
-    for labels_example in labels:
-        labels_example = [label if label != 0 else -100 for label in labels_example]
-        labels_with_ignore_index.append(labels_example)
-
-    model_inputs["labels"] = labels_with_ignore_index
+    labels[labels == tokenizer.pad_token_id] = -100
+    model_inputs["labels"] = labels
 
     return model_inputs
 
@@ -57,9 +50,10 @@ def preprocess(tokenizer: RobertaTokenizer, examples):
 class CodeT5(pl.LightningModule):
     def __init__(
         self,
-        *,
         dataset,
         tokenizer: RobertaTokenizer,
+        train_bs,
+        eval_bs,
         lr=5e-5,
         num_train_epochs=15,
         warmup_steps=1000,
@@ -70,9 +64,12 @@ class CodeT5(pl.LightningModule):
 
         self.dataset = dataset
         self.tokenizer = tokenizer
-        self.save_hyperparameters()
 
+        self.save_hyperparameters(ignore=["dataset", "tokenizer"])
+
+        # Setup metrics
         self.metrics = evaluate.load("bleu")
+
         self.targets = []
         self.predictions = []
 
@@ -133,50 +130,58 @@ class CodeT5(pl.LightningModule):
         return {"optimizer": optimizer, "lr_scheduler": lr_scheduler}
 
     def train_dataloader(self):
-        return DataLoader(self.dataset["train"], shuffle=True, batch_size=16)
+        return DataLoader(self.dataset["train"], shuffle=True, batch_size=self.hparams.train_bs)
 
     def val_dataloader(self):
-        return DataLoader(self.dataset["valid"], batch_size=8)
-
-    def test_dataloader(self):
-        return DataLoader(self.dataset["test"], batch_size=8)
+        return DataLoader(self.dataset["valid"], batch_size=self.hparams.eval_bs)
 
 
 def main():
+    training_args = RunArgs.build()
     model_output_path = Config.MODEL_CHECKPOINT_BASE_PATH / "t5-pl-hub"
-    wandb_logger = WandbLogger(
-        project="CommitPredictorT5PL", name="t5-pl-max-input-size-512"
-    )
+
+    wandb_logger = WandbLogger(project="CommitPredictorT5PL", name=training_args.run_name)
+    wandb_logger.log_hyperparams(asdict(training_args))
+
+    if training_args.output_to_custom_dir:
+        model_output_path = Config.MODEL_CHECKPOINT_BASE_PATH / wandb_logger.experiment.id
+
+    print(f"▶️ Run name: {wandb_logger.experiment.name} [{wandb_logger.experiment.id}]")
+    print(f"▶️ Output path: {str(model_output_path)}")
     print(f"🚨 Running on {accelerator}")
 
+    print(f"ℹ️ Loading Tokenizer")
     tokenizer = RobertaTokenizer.from_pretrained("Salesforce/codet5-base-multi-sum")
     tokenizer.add_tokens(["<ide>", "<add>", "<del>"], special_tokens=True)
-    dataset = prepare_dataset(tokenizer, preprocess)
 
+    print(f"ℹ️ Loading Dataset")
+    dataset = prepare_dataset(training_args, tokenizer, preprocess)
     dataset.set_format(type="torch", columns=["input_ids", "attention_mask", "labels"])
-    model = CodeT5(dataset=dataset, tokenizer=tokenizer)
 
+    print(f"ℹ️ Loading Model")
+    model = CodeT5(dataset=dataset, tokenizer=tokenizer, train_bs=training_args.train_bs, eval_bs=training_args.eval_bs)
+
+    print(f"ℹ️ Setting up trainer")
+    lr_monitor = LearningRateMonitor(logging_interval="step")
     early_stop_callback = EarlyStopping(
         monitor="validation_loss", patience=3, strict=False, verbose=False, mode="min"
     )
 
-    lr_monitor = LearningRateMonitor(logging_interval="step")
-
     trainer = Trainer(
-        accelerator=accelerator,
+        accelerator=accelerator if not training_args.debug else None,
         precision=16,
         default_root_dir=model_output_path / "checkpoints",
         logger=wandb_logger,
         callbacks=[early_stop_callback, lr_monitor],
-        accumulate_grad_batches=3,
+        accumulate_grad_batches=training_args.acc_grad_steps,
     )
 
     trainer.fit(model)
-    model.model.save_pretrained(model_output_path)
-
-    new_model = T5ForConditionalGeneration.from_pretrained(model_output_path)
-    new_model.push_to_hub("CommitPredictorT5PL")
-    tokenizer.push_to_hub("CommitPredictorT5PL")
+    if not training_args.debug:
+        model.model.save_pretrained(model_output_path)
+        new_model = T5ForConditionalGeneration.from_pretrained(model_output_path)
+        new_model.push_to_hub("CommitPredictorT5PL")
+        tokenizer.push_to_hub("CommitPredictorT5PL")
 
 
 if __name__ == "__main__":

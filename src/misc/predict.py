@@ -59,9 +59,7 @@ def main():
 
     model = RobertaForMaskedLM.from_pretrained(path, revision="c653c13")
     # path = '/home/dron/work/temp/BscModel/output-model/mlm/'
-    tokenizer = RobertaTokenizer.from_pretrained(
-        path, revision="c653c13", truncation=True
-    )
+    tokenizer = RobertaTokenizer.from_pretrained(path, revision="c653c13", truncation=True)
 
     # Create a torch.device object for the GPU
     # gpu_index = torch.cuda.current_device()
@@ -143,5 +141,79 @@ def predict_commit(pipe, message, length, n_beams=7):
     return commits
 
 
+def test():
+    patch = """<ide><path>CHANGELOG.md 
+<ide> 
+<ide> ### Bug Fixes
+<ide> - Fixed cookies which contained unescaped '=' would not show up in cookie service.
+<add>- Consider all 2xx responses as OK, not just 200
+<ide> 
+<ide> 
+<ide> 
+<ide><path>src/service/xhr.js
+<ide> angularServiceInject('$xhr', function($browser, $error, $log){
+<ide>             response = fromJson(response, true);
+<ide>           }
+<ide>         }
+<del>        if (code == 200) {
+<add>        if (200 <= code && code < 300) {
+<ide>           callback(code, response);
+<ide>         } else {
+<ide>           $error(
+<ide><path>test/service/xhrSpec.js
+<ide> describe('$xhr', function() {
+<ide>   var scope, $browser, $browserXhr, $log, $xhr, log;
+<ide> 
+<ide>   beforeEach(function(){
+<del>    scope = angular.scope({}, angular.service, { '$log': $log = {} });
+<add>    scope = angular.scope({}, angular.service, { '$log': $log = {
+<add>        error: dump
+<add>    } });
+<ide>     $browser = scope.$service('$browser');
+<ide>     $browserXhr = $browser.xhr;
+<ide>     $xhr = scope.$service('$xhr');
+<ide> describe('$xhr', function() {
+<ide> 
+<ide> 
+<ide>   function callback(code, response) {
+<del>    expect(code).toEqual(200);
+<del>    log = log + toJson(response) + ';';
+<add>    log = log + '{code=' + code + '; response=' + toJson(response) + '}';
+<ide>   }
+<ide> 
+<ide> 
+<ide> describe('$xhr', function() {
+<ide> 
+<ide>     $browserXhr.flush();
+<ide> 
+<del>    expect(log).toEqual('""third"";[""second""];""first"";');
+<add>    expect(log).toEqual(
+<add>        '{code=200; response=""third""}' +
+<add>        '{code=200; response=[""second""]}' +
+<add>        '{code=200; response=""first""}');
+<add>  });
+<add>
+<add>  it('should allow all 2xx requests', function(){
+<add>    $browserXhr.expectGET('/req1').respond(200, '1');
+<add>    $xhr('GET', '/req1', null, callback);
+<add>    $browserXhr.flush();
+<add>
+<add>    $browserXhr.expectGET('/req2').respond(299, '2');
+<add>    $xhr('GET', '/req2', null, callback);
+<add>    $browserXhr.flush();
+<add>
+<add>    expect(log).toEqual(
+<add>        '{code=200; response=""1""}' +
+<add>        '{code=299; response=""2""}');
+<ide>   });
+<ide> 
+<ide> """
+    tokenizer = RobertaTokenizer.from_pretrained("mamiksik/CommitPredictor")
+    tokenizer.add_tokens(["<path>", "<ide>", "<del>", "<add>", "<msg>"], special_tokens=True)
+    tokenized = tokenizer.tokenize(patch)
+    pass
+
+
 if __name__ == "__main__":
-    main()
+    test()
+    # main()

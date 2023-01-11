@@ -1,12 +1,13 @@
 import re
 import warnings
+from dataclasses import dataclass, field
 from math import log
 from pathlib import Path
 
 import numpy as np
 import torch
 from datasets import load_dataset, DatasetDict, Dataset
-from transformers import RobertaTokenizer
+from transformers import RobertaTokenizer, HfArgumentParser
 
 warnings.simplefilter(action="ignore", category=FutureWarning)
 warnings.simplefilter(action="ignore", category=UserWarning)
@@ -40,71 +41,67 @@ def preprocess_logits_for_metrics(logits, labels):
     return logits.argmax(dim=-1)
 
 
-def prepare_dataset(tokenizer: RobertaTokenizer, preprocess) -> DatasetDict:
-    dataset = load_dataset("mamiksik/CommitDiffs", use_auth_token=True)
+def prepare_dataset(training_args: 'RunArgs', tokenizer: RobertaTokenizer, preprocess) -> DatasetDict:
+    dataset = load_dataset("mamiksik/processed-commit-diffs", revision=training_args.dataset_rev)
 
-    # dataset = DatasetDict({
-    #     "train": Dataset.from_dict(dataset["train"][:2]),
-    #     "test": Dataset.from_dict(dataset["valid"][:2]),
-    #     "valid": Dataset.from_dict(dataset["valid"][:2]),
-    # })
+    if training_args.debug:
+        dataset = DatasetDict({
+            "train": Dataset.from_dict(dataset["train"][:2]),
+            "test": Dataset.from_dict(dataset["test"][:2]),
+            "valid": Dataset.from_dict(dataset["valid"][:2]),
+        })
+
+    if not training_args.allow_multi_file_commits:
+        dataset = dataset.filter(lambda x: x['file_count'] == 1, keep_in_memory=True)
+
+    if not training_args.allow_mixed_files:
+        dataset = dataset.filter(lambda x: x['content_type'] != 'Mixed', keep_in_memory=True)
 
     tokenized_datasets = dataset.map(
-        lambda x: preprocess(tokenizer, x),
+        lambda x: preprocess(training_args, tokenizer, x),
         batched=True,
-        remove_columns=["message", "patch", "language"],
+        remove_columns=["message", "patch", "content_type", "file_count"],
         num_proc=4,
     )
     tokenized_datasets.set_format("torch")
     return tokenized_datasets
 
 
-def preprocess_t5(tokenizer: RobertaTokenizer, examples):
-    max_input_length = 256
-    max_target_length = 128
+@dataclass
+class RunArgs:
+    train_bs: int = field(default=8, metadata={"help": "Train batch size"})
+    eval_bs: int = field(default=8, metadata={"help": "Eval batch size"})
+    acc_grad_steps: int = field(default=3, metadata={"help": "Gradient accumulation steps"})
+    max_input_size: int = field(default=256, metadata={"help": "Max input size"})
+    max_target_size: int = field(default=128, metadata={"help": "Max target size"})
 
-    # encode the code-docstring pairs
-    language = examples["language"]
-    patch = np.array(examples["patch"])
-    commit_message = np.array(examples["message"])
+    allow_multi_file_commits: bool = field(default=False, metadata={"help": "Train model on commits consisting of "
+                                                                    "multiple files"})
 
-    ii = np.where(commit_message == None)[0]
-    commit_message = np.delete(commit_message, ii)
-    patch = np.delete(patch, ii)
+    allow_mixed_files: bool = field(default=False, metadata={"help": "Train model on commits consisting of "
+                                                                     "mixed file types"})
 
-    inputs = [f"Summarize {lang}: " + code for lang, code in zip(language, patch)]
-    model_inputs = tokenizer(
-        inputs, max_length=max_input_length, padding="max_length", truncation=True
-    )
+    dataset_rev: str = field(default=None, metadata={"help": "Dataset revision"})
+    debug: bool = field(default=False, metadata={"help": "For running the model locally (e.g. restring dataset to "
+                                                         "2 elements)"})
 
-    # Encode the summaries
-    labels = tokenizer(
-        list(commit_message),
-        max_length=max_target_length,
-        padding="max_length",
-        truncation=True,
-    ).input_ids
+    run_name: str = field(default=None, metadata={"help": "What makes this run special?"})
+    output_to_custom_dir: bool = field(default=False, metadata={"help": "Output to custom directory? (wanadb run name)"})
 
-    # important: we need to replace the index of the padding tokens by -100
-    # such that they are not taken into account by the CrossEntropyLoss
-    labels_with_ignore_index = []
-    for labels_example in labels:
-        labels_example = [label if label != 0 else -100 for label in labels_example]
-        labels_with_ignore_index.append(labels_example)
-
-    model_inputs["labels"] = labels_with_ignore_index
-
-    return model_inputs
+    @staticmethod
+    def build() -> 'RunArgs':
+        parser = HfArgumentParser(RunArgs)
+        return parser.parse_args_into_dataclasses()[0]
 
 
 def predict_commit(pipe, message, length, n_beams=7):
     beams_prob = [0.0, 0.0]
     text = (
-        message + f" </s></s> <msg>" + " <mask>" * length
+            message + f" </s></s> <msg>" + " <mask>" * length
     )  # so that last dim still predicts
     beams = [
-        text,
-    ] * 2
+                text,
+            ] * 2
     for i in range(length):
         beams = beams[:n_beams]
         beams_prob = beams_prob[:n_beams]
@@ -120,10 +117,10 @@ def predict_commit(pipe, message, length, n_beams=7):
         new_beams_prob = []
         for beam_prob, input_result in zip(beams_prob, r):
             for prediction in (
-                input_result if last_mask else input_result[0]
+                    input_result if last_mask else input_result[0]
             ):  # only 1st mask
                 if (
-                    last_mask
+                        last_mask
                 ):  # Avoid overcompensating branches where last token is obvisous (period etc.)
                     new_beams.append(prediction["sequence"])
                     new_beams_prob.append(beam_prob)
