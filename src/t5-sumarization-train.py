@@ -119,7 +119,6 @@ def main():
         num_train_epochs=15,
         metric_for_best_model="eval_loss",
         predict_with_generate=True,
-
         warmup_steps=1000,  # From PL example
     )
 

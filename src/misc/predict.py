@@ -59,7 +59,9 @@ def main():
 
     model = RobertaForMaskedLM.from_pretrained(path, revision="c653c13")
     # path = '/home/dron/work/temp/BscModel/output-model/mlm/'
-    tokenizer = RobertaTokenizer.from_pretrained(path, revision="c653c13", truncation=True)
+    tokenizer = RobertaTokenizer.from_pretrained(
+        path, revision="c653c13", truncation=True
+    )
 
     # Create a torch.device object for the GPU
     # gpu_index = torch.cuda.current_device()
@@ -209,7 +211,9 @@ def test():
 <ide> 
 <ide> """
     tokenizer = RobertaTokenizer.from_pretrained("mamiksik/CommitPredictor")
-    tokenizer.add_tokens(["<path>", "<ide>", "<del>", "<add>", "<msg>"], special_tokens=True)
+    tokenizer.add_tokens(
+        ["<path>", "<ide>", "<del>", "<add>", "<msg>"], special_tokens=True
+    )
     tokenized = tokenizer.tokenize(patch)
     pass
 

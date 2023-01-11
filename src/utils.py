@@ -41,21 +41,29 @@ def preprocess_logits_for_metrics(logits, labels):
     return logits.argmax(dim=-1)
 
 
-def prepare_dataset(training_args: 'RunArgs', tokenizer: RobertaTokenizer, preprocess) -> DatasetDict:
-    dataset = load_dataset("mamiksik/processed-commit-diffs", revision=training_args.dataset_rev)
+def prepare_dataset(
+    training_args: "RunArgs", tokenizer: RobertaTokenizer, preprocess
+) -> DatasetDict:
+    dataset = load_dataset(
+        "mamiksik/processed-commit-diffs", revision=training_args.dataset_rev
+    )
 
     if training_args.debug:
-        dataset = DatasetDict({
-            "train": Dataset.from_dict(dataset["train"][:2]),
-            "test": Dataset.from_dict(dataset["test"][:2]),
-            "valid": Dataset.from_dict(dataset["valid"][:2]),
-        })
+        dataset = DatasetDict(
+            {
+                "train": Dataset.from_dict(dataset["train"][:2]),
+                "test": Dataset.from_dict(dataset["test"][:2]),
+                "valid": Dataset.from_dict(dataset["valid"][:2]),
+            }
+        )
 
     if not training_args.allow_multi_file_commits:
-        dataset = dataset.filter(lambda x: x['file_count'] == 1, keep_in_memory=True)
+        dataset = dataset.filter(lambda x: x["file_count"] == 1, keep_in_memory=True)
 
     if not training_args.allow_mixed_files:
-        dataset = dataset.filter(lambda x: x['content_type'] != 'Mixed', keep_in_memory=True)
+        dataset = dataset.filter(
+            lambda x: x["content_type"] != "Mixed", keep_in_memory=True
+        )
 
     tokenized_datasets = dataset.map(
         lambda x: preprocess(training_args, tokenizer, x),
@@ -71,25 +79,41 @@ def prepare_dataset(training_args: 'RunArgs', tokenizer: RobertaTokenizer, prepr
 class RunArgs:
     train_bs: int = field(default=8, metadata={"help": "Train batch size"})
     eval_bs: int = field(default=8, metadata={"help": "Eval batch size"})
-    acc_grad_steps: int = field(default=3, metadata={"help": "Gradient accumulation steps"})
+    acc_grad_steps: int = field(
+        default=3, metadata={"help": "Gradient accumulation steps"}
+    )
     max_input_size: int = field(default=256, metadata={"help": "Max input size"})
     max_target_size: int = field(default=128, metadata={"help": "Max target size"})
 
-    allow_multi_file_commits: bool = field(default=False, metadata={"help": "Train model on commits consisting of "
-                                                                    "multiple files"})
+    allow_multi_file_commits: bool = field(
+        default=False,
+        metadata={"help": "Train model on commits consisting of " "multiple files"},
+    )
 
-    allow_mixed_files: bool = field(default=False, metadata={"help": "Train model on commits consisting of "
-                                                                     "mixed file types"})
+    allow_mixed_files: bool = field(
+        default=False,
+        metadata={"help": "Train model on commits consisting of " "mixed file types"},
+    )
 
     dataset_rev: str = field(default=None, metadata={"help": "Dataset revision"})
-    debug: bool = field(default=False, metadata={"help": "For running the model locally (e.g. restring dataset to "
-                                                         "2 elements)"})
+    debug: bool = field(
+        default=False,
+        metadata={
+            "help": "For running the model locally (e.g. restring dataset to "
+            "2 elements)"
+        },
+    )
 
-    run_name: str = field(default=None, metadata={"help": "What makes this run special?"})
-    output_to_custom_dir: bool = field(default=False, metadata={"help": "Output to custom directory? (wanadb run name)"})
+    run_name: str = field(
+        default=None, metadata={"help": "What makes this run special?"}
+    )
+    output_to_custom_dir: bool = field(
+        default=False,
+        metadata={"help": "Output to custom directory? (wanadb run name)"},
+    )
 
     @staticmethod
-    def build() -> 'RunArgs':
+    def build() -> "RunArgs":
         parser = HfArgumentParser(RunArgs)
         return parser.parse_args_into_dataclasses()[0]
 
@@ -97,11 +121,11 @@ class RunArgs:
 def predict_commit(pipe, message, length, n_beams=7):
     beams_prob = [0.0, 0.0]
     text = (
-            message + f" </s></s> <msg>" + " <mask>" * length
+        message + f" </s></s> <msg>" + " <mask>" * length
     )  # so that last dim still predicts
     beams = [
-                text,
-            ] * 2
+        text,
+    ] * 2
     for i in range(length):
         beams = beams[:n_beams]
         beams_prob = beams_prob[:n_beams]
@@ -117,10 +141,10 @@ def predict_commit(pipe, message, length, n_beams=7):
         new_beams_prob = []
         for beam_prob, input_result in zip(beams_prob, r):
             for prediction in (
-                    input_result if last_mask else input_result[0]
+                input_result if last_mask else input_result[0]
             ):  # only 1st mask
                 if (
-                        last_mask
+                    last_mask
                 ):  # Avoid overcompensating branches where last token is obvisous (period etc.)
                     new_beams.append(prediction["sequence"])
                     new_beams_prob.append(beam_prob)
