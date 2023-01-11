@@ -15,7 +15,7 @@ import pytorch_lightning as pl
 import wandb
 from utils import prepare_dataset, Config, accelerator
 
-max_input_length = 256
+max_input_length = 512
 max_target_length = 128
 
 
@@ -145,7 +145,7 @@ class CodeT5(pl.LightningModule):
 def main():
     model_output_path = Config.MODEL_CHECKPOINT_BASE_PATH / "t5-pl-hub"
     wandb_logger = WandbLogger(
-        project="CommitPredictorT5PL", name="t5-pl-larger-batch-size"
+        project="CommitPredictorT5PL", name="t5-pl-max-input-size-512"
     )
     print(f"🚨 Running on {accelerator}")
 
