@@ -3,35 +3,25 @@ from typing import Any
 import evaluate
 import numpy as np
 import torch
-from datasets import Dataset, DatasetDict
-from transformers.data.data_collator import (
-    _torch_collate_batch,
-    tf_default_data_collator,
-    torch_default_data_collator,
-)
-
 import wandb
 
 from transformers import (
     RobertaTokenizer,
     TrainingArguments,
     Trainer,
-    DataCollatorForLanguageModeling,
     RobertaForMaskedLM,
     EarlyStoppingCallback,
 )
 
-from bleu4 import AsyncBleu4Callback
 from utils import (
     Config,
     preprocess_logits_for_metrics,
-    hyperparameter_defaults,
     prepare_dataset,
     device,
-    accelerator,
+    accelerator, RunArgs,
 )
 
-wandb.init(config=hyperparameter_defaults, project="CommitPredictor")
+wandb.init(project="CommitPredictor")
 
 
 def preprocess(tokenizer: RobertaTokenizer, examples):
@@ -142,6 +132,8 @@ def msg_masking_collator(tokenizer, features: list[list[int] | Any | dict[str, A
 
 
 def main():
+    training_args = RunArgs.build()
+
     model_name = "microsoft/codebert-base-mlm"
     model_output_path = Config.MODEL_CHECKPOINT_BASE_PATH / "mlm"
     print(f"▶️  Model name: {model_name}")
@@ -156,12 +148,7 @@ def main():
     metric = {"accuracy": evaluate.load("accuracy")}
 
     print(f"ℹ️  Loading Dataset")
-    tokenized_dataset = prepare_dataset(tokenizer, preprocess)
-
-    print(f"ℹ️  Initializing Trainer")
-    data_collator = DataCollatorForLanguageModeling(
-        tokenizer=tokenizer, mlm_probability=0.20
-    )
+    tokenized_dataset = prepare_dataset(training_args, tokenizer, preprocess)
 
     training_args = TrainingArguments(
         output_dir=str(model_output_path),
@@ -174,14 +161,14 @@ def main():
         save_strategy="epoch",
         evaluation_strategy="epoch",
         save_total_limit=50,
-        learning_rate=wandb.config["learning_rate"],
-        weight_decay=wandb.config["weight_decay"],
-        # metric_for_best_model='eval_bleu4',
+        learning_rate=2e-5,
+        weight_decay=0.01,
+        metric_for_best_model='eval_loss',
         num_train_epochs=50,
         fp16=accelerator == "cuda",
-        per_device_train_batch_size=21,
-        per_device_eval_batch_size=21,
-        gradient_accumulation_steps=3,
+        per_device_train_batch_size=training_args.train_bs,
+        per_device_eval_batch_size=training_args.eval_bs,
+        gradient_accumulation_steps=training_args.acc_grad_steps,
         remove_unused_columns=False,
     )
 
@@ -194,7 +181,7 @@ def main():
         compute_metrics=lambda eval_pred: compute_metrics(metric, eval_pred),
         preprocess_logits_for_metrics=preprocess_logits_for_metrics,
         data_collator=lambda inputs: msg_masking_collator(tokenizer, inputs),
-        # callbacks=[EarlyStoppingCallback(early_stopping_patience=3), bleu4_callback],
+        callbacks=[EarlyStoppingCallback(early_stopping_patience=3)],
     )
 
     print(f"🏋️‍♂️  Training")

@@ -14,12 +14,6 @@ warnings.simplefilter(action="ignore", category=UserWarning)
 
 relative_root = Path(__file__).parent.resolve() / ".."
 
-hyperparameter_defaults = dict(
-    learning_rate=2e-5,
-    weight_decay=0.01,
-    epochs=10,
-)
-
 accelerator = "cpu"
 if torch.cuda.is_available():
     accelerator = "cuda"
