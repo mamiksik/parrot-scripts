@@ -24,7 +24,7 @@ from utils import (
 wandb.init(project="CommitPredictor")
 
 
-def preprocess(tokenizer: RobertaTokenizer, examples):
+def preprocess(training_args: RunArgs, tokenizer: RobertaTokenizer, examples):
     messages = [f"<msg> {message}" for message in examples["message"]]
     inputs = tokenizer(
         examples["patch"],
@@ -67,7 +67,7 @@ def init_model_tokenizer(
     model.to(device)
 
     tokenizer = RobertaTokenizer.from_pretrained(tokenizer_name)
-    tokenizer.add_tokens(["<ide>", "<add>", "<del>", "<msg>"], special_tokens=True)
+    tokenizer.add_tokens(["<ide>", "<add>", "<del>", "<msg>", "<path>"], special_tokens=True)
     model.resize_token_embeddings(len(tokenizer))
     return model, tokenizer
 
