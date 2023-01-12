@@ -51,6 +51,8 @@ def preprocess(training_args: RunArgs, tokenizer: RobertaTokenizer, examples):
 
 
 class CodeT5(pl.LightningModule):
+    model: T5ForConditionalGeneration
+
     def __init__(
         self,
         dataset,
@@ -167,7 +169,7 @@ def main():
 
     print(f"ℹ️ Loading Tokenizer")
     tokenizer = RobertaTokenizer.from_pretrained("Salesforce/codet5-base-multi-sum")
-    tokenizer.add_tokens(["<ide>", "<add>", "<del>"], special_tokens=True)
+    tokenizer.add_tokens(["<ide>", "<add>", "<del>", "<path>"], special_tokens=True)
 
     print(f"ℹ️ Loading Dataset")
     dataset = prepare_dataset(training_args, tokenizer, preprocess)
@@ -200,8 +202,8 @@ def main():
     if not training_args.debug:
         model.model.save_pretrained(model_output_path)
         new_model = T5ForConditionalGeneration.from_pretrained(model_output_path)
-        new_model.push_to_hub("CommitPredictorT5PL")
-        tokenizer.push_to_hub("CommitPredictorT5PL")
+        new_model.push_to_hub("CommitPredictorT5PL", commit_message=f"Experiment ID: {wandb_logger.experiment.id}")
+        tokenizer.push_to_hub("CommitPredictorT5PL", commit_message=f"Experiment ID: {wandb_logger.experiment.id}")
 
 
 if __name__ == "__main__":
