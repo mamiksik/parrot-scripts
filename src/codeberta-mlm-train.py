@@ -136,6 +136,9 @@ def main():
 
     model_name = "microsoft/codebert-base-mlm"
     model_output_path = Config.MODEL_CHECKPOINT_BASE_PATH / "mlm"
+    if training_args.output_to_custom_dir:
+        model_output_path = Config.MODEL_CHECKPOINT_BASE_PATH / wandb.run.name
+
     print(f"▶️  Model name: {model_name}")
     print(f"▶️  Output path: {str(model_output_path)}")
 
