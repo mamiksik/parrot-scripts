@@ -58,7 +58,7 @@ def evaluate_batch(metric, batch, model):
 
 
 def evaluate_model(dataset, metric, model, for_lang=None):
-    batch_size = 20
+    batch_size = 35
     test_ds = dataset['test']
     if for_lang is not None:
         test_ds = test_ds.filter(lambda x: x["main_lang"] == for_lang, keep_in_memory=True)
