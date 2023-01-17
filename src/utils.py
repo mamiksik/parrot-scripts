@@ -25,6 +25,7 @@ device = torch.device(accelerator)
 
 class Config:
     MODEL_CHECKPOINT_BASE_PATH = relative_root / "output-model"
+    EVAL_OUTPUT = relative_root / 'eval_result.csv'
 
 
 def preprocess_logits_for_metrics(logits, labels):
