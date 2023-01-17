@@ -9,7 +9,7 @@ from tqdm import tqdm
 import torch
 from transformers import RobertaTokenizer, T5ForConditionalGeneration
 
-from src.utils import Config
+from utils import Config
 
 SUPPORTED_LANGUAGES = ["Java", "Go", "PHP", "Javascript", "Ruby", "Python"]
 DEVICE = torch.device("cuda")
