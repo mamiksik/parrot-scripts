@@ -57,17 +57,20 @@ def evaluate_batch(metric, batch, model):
     return metric.compute(predictions=predictions, references=labels, smooth=True)['bleu']
 
 
-def evaluate_model(dataset, metric, model, for_lang=None):
-    batch_size = 35
+def evaluate_model(dataset, metric, model, *, for_lang=None, multi_file=False):
+    batch_size = 100
     test_ds = dataset['test']
     if for_lang is not None:
         test_ds = test_ds.filter(lambda x: x["main_lang"] == for_lang, keep_in_memory=True)
+
+    if multi_file:
+        test_ds = test_ds.filter(lambda x: x["file_count"] == 1, keep_in_memory=True)
 
     to_process = len(test_ds)
     trials = []
     for i in tqdm(range(0, to_process, batch_size)):
         trials.append(evaluate_batch(metric, test_ds[i:i+batch_size], model))
-    # trials = [evaluate_batch(dataset['test'][:10], model)]
+
     avg = sum(trials) / len(trials)
     return round(avg * 100, 2)
 
@@ -83,23 +86,26 @@ def main():
     }
 
     results = []
-    for model_name, model in models.items():
-        print(f"===== {model_name} =====")
-        result = dict()
-        result['Model'] = model_name
+    for input_type in ["Multi File", "Single File"]:
+        is_multifile = input_type == "Multi File"
+        for model_name, model in models.items():
+            print(f"===== {input_type}-{model_name} =====")
+            result = dict()
+            result['Model'] = model_name
+            result['Input'] = input_type
 
-        with model:
-            result['Overall'] = evaluate_model(dataset, metric, model)
-            print(f"Overall: {result['Overall']}")
-
-        for main_lang in SUPPORTED_LANGUAGES:
             with model:
-                result[main_lang] = evaluate_model(dataset, metric, model, main_lang)
-                print(f"For {main_lang}: {result[main_lang]}")
+                result['Overall'] = evaluate_model(dataset, metric, model, multi_file=is_multifile)
+                print(f"Overall: {result['Overall']}")
 
-        results.append(result)
+            for main_lang in SUPPORTED_LANGUAGES:
+                with model:
+                    result[main_lang] = evaluate_model(dataset, metric, model, for_lang=main_lang, multi_file=is_multifile)
+                    print(f"For {main_lang}: {result[main_lang]}")
 
-        print(f"===== END {model_name} =====")
+            results.append(result)
+
+            print(f"===== END {model_name} =====")
 
     df = pd.DataFrame.from_records(results, columns=["Model", "Overall"] + SUPPORTED_LANGUAGES)
     df.to_csv(Config.EVAL_OUTPUT, index=False)
