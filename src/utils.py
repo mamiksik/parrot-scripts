@@ -63,7 +63,7 @@ def prepare_dataset(
     tokenized_datasets = dataset.map(
         lambda x: preprocess(training_args, tokenizer, x),
         batched=True,
-        remove_columns=["message", "patch", "content_type", "file_count", "main_lang"],
+        remove_columns=["message", "patch", "content_type", "file_count", "main_lang", "sha"],
         num_proc=4,
     )
     tokenized_datasets.set_format("torch")
@@ -77,7 +77,7 @@ class RunArgs:
     acc_grad_steps: int = field(
         default=3, metadata={"help": "Gradient accumulation steps"}
     )
-    max_input_size: int = field(default=256, metadata={"help": "Max input size"})
+    max_input_size: int = field(default=512, metadata={"help": "Max input size"})
     max_target_size: int = field(default=128, metadata={"help": "Max target size"})
 
     allow_multi_file_commits: bool = field(
