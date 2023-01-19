@@ -191,6 +191,8 @@ def main():
 
     trainer = Trainer(
         accelerator=accelerator if not training_args.debug else None,
+        devices=2,
+        strategy="ddp",
         precision=16,
         default_root_dir=model_output_path / "checkpoints",
         logger=wandb_logger,
