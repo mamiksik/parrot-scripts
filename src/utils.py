@@ -63,7 +63,7 @@ def prepare_dataset(
     tokenized_datasets = dataset.map(
         lambda x: preprocess(training_args, tokenizer, x),
         batched=True,
-        remove_columns=["message", "patch", "content_type", "file_count"],
+        remove_columns=["message", "patch", "content_type", "file_count", "main_lang"],
         num_proc=4,
     )
     tokenized_datasets.set_format("torch")

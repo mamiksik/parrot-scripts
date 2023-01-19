@@ -31,6 +31,7 @@ def preprocess(training_args: RunArgs, tokenizer: RobertaTokenizer, examples):
         messages,
         padding="max_length",
         truncation="only_first",
+        max_length=training_args.max_input_size,
         # https://github.com/neulab/code-bert-score/blob/main/run_mlm.py#L448
         # We use this option because DataCollatorForLanguageModeling (see below) is more efficient when it
         # receives the `special_tokens_mask`.
