@@ -156,7 +156,7 @@ def main():
     training_args = TrainingArguments(
         output_dir=str(model_output_path),
         overwrite_output_dir=True,
-        hub_model_id="mamiksik/CommitPredictor",
+        hub_model_id="mamiksik/CodeBERTa-commit-message-autocomplete",
         report_to=["wandb"],
         push_to_hub=True,
         hub_strategy="end",
@@ -175,7 +175,6 @@ def main():
         remove_unused_columns=False,
     )
 
-    # with AsyncBleu4Callback(eval_dataset=tokenized_dataset["test"], run=wandb.run) as bleu4_callback:
     trainer = Trainer(
         model=model,
         args=training_args,

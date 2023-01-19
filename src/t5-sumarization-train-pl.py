@@ -202,8 +202,8 @@ def main():
     if not training_args.debug:
         model.model.save_pretrained(model_output_path)
         new_model = T5ForConditionalGeneration.from_pretrained(model_output_path)
-        new_model.push_to_hub("CommitPredictorT5PL", commit_message=f"Experiment ID: {wandb_logger.experiment.id}")
-        tokenizer.push_to_hub("CommitPredictorT5PL", commit_message=f"Experiment ID: {wandb_logger.experiment.id}")
+        new_model.push_to_hub("CodeT5-commit-message-generator", commit_message=f"Experiment ID: {wandb_logger.experiment.id}")
+        tokenizer.push_to_hub("CodeT5-commit-message-generator", commit_message=f"Experiment ID: {wandb_logger.experiment.id}")
 
 
 if __name__ == "__main__":
