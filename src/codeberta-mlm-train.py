@@ -166,6 +166,7 @@ def main():
         save_total_limit=50,
         learning_rate=2e-5,
         weight_decay=0.01,
+        warmup_steps=1000,
         metric_for_best_model='eval_loss',
         num_train_epochs=50,
         fp16=accelerator == "cuda",
