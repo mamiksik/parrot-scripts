@@ -11,6 +11,7 @@ from transformers import (
     Trainer,
     RobertaForMaskedLM,
     EarlyStoppingCallback,
+    DataCollatorForLanguageModeling
 )
 
 from utils import (
@@ -38,20 +39,23 @@ def preprocess(training_args: RunArgs, tokenizer: RobertaTokenizer, examples):
         return_special_tokens_mask=True,
     )
 
-    masking_mask = []
+    labels = []
     for input_ids in inputs["input_ids"]:
         start_msg_index = input_ids.index(tokenizer.sep_token_id) + 3  # </s></s><msg>
         try:
             end_msg_index = input_ids.index(tokenizer.pad_token_id)
         except ValueError:
             end_msg_index = len(input_ids)
+        label = np.asarray(input_ids.copy())
+        label[:start_msg_index] = -100
+        label[end_msg_index:] = -100
+        labels.append(label)
+        # mask = np.zeros(len(input_ids), dtype=bool)
+        # mask[start_msg_index:end_msg_index] = True
+        # masking_mask.append(mask)
 
-        mask = np.zeros(len(input_ids), dtype=bool)
-        mask[start_msg_index:end_msg_index] = True
-        masking_mask.append(mask)
-
-    inputs["labels"] = inputs["input_ids"].copy()
-    inputs["masking_mask"] = masking_mask
+    # inputs["labels"] = inputs["input_ids"].copy()
+    inputs["labels"] = labels
 
     return inputs
 
@@ -96,16 +100,17 @@ def msg_masking_collator(tokenizer, features: list[list[int] | Any | dict[str, A
     # features = [torch.tensor(e, dtype=torch.long) for e in features]
 
     inputs = batch["input_ids"].clone()
-    labels = batch["input_ids"].clone()
-    probability_matrix = torch.full(labels.shape, 0.2)
+    labels = batch["labels"].clone()
+    probability_matrix = torch.full(labels.shape, 0.5)
 
     special_tokens_mask = batch.pop("special_tokens_mask")
     special_tokens_mask = special_tokens_mask.bool()
     probability_matrix.masked_fill_(special_tokens_mask, value=0.0)
+    probability_matrix.masked_fill_(labels == -100, value=0.0)
 
-    masking_mask = batch.pop("masking_mask")
-    masking_mask = masking_mask.bool()
-    probability_matrix.masked_fill_(~masking_mask, value=0.0)
+    # masking_mask = batch.pop("masking_mask")
+    # masking_mask = masking_mask.bool()
+    # probability_matrix.masked_fill_(~masking_mask, value=0.0)
 
     masked_indices = torch.bernoulli(probability_matrix).bool()
     labels[~masked_indices] = -100  # We only compute loss on masked tokens
@@ -114,7 +119,7 @@ def msg_masking_collator(tokenizer, features: list[list[int] | Any | dict[str, A
     indices_replaced = (
         torch.bernoulli(torch.full(labels.shape, 0.8)).bool() & masked_indices
     )
-    inputs[masked_indices] = tokenizer.convert_tokens_to_ids(tokenizer.mask_token)
+    inputs[indices_replaced] = tokenizer.convert_tokens_to_ids(tokenizer.mask_token)
 
     # 10% of the time, we replace masked input tokens with random word
     indices_random = (
@@ -192,6 +197,7 @@ def main():
     trainer.train()
 
     print(f"🚀  Pushing model to HuggingFace Hub")
+    tokenizer.push_to_hub("mamiksik/CodeBERTa-commit-message-autocomplete", commit_message=f"End of training {wandb.run.name}")
     commit_id = trainer.push_to_hub(f"End of training {wandb.run.name}", blocking=True)
     print(f"🎉  Model pushed to HuggingFace Hub: {commit_id}")
 
