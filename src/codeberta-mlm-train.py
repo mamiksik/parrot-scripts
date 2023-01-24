@@ -11,7 +11,8 @@ from transformers import (
     Trainer,
     RobertaForMaskedLM,
     EarlyStoppingCallback,
-    DataCollatorForWholeWordMask,
+    DataCollatorForLanguageModeling,
+    RobertaTokenizerFast,
 )
 
 from utils import (
@@ -50,6 +51,8 @@ def preprocess(training_args: RunArgs, tokenizer: RobertaTokenizer, examples):
         inputs["labels"][idx][:start_msg_index] = -100
         inputs["labels"][idx][end_msg_index:] = -100
 
+        # words_ids = np.asarray(inputs.word_ids(0))
+        # inputs["labels"][idx].word_ids()
         inputs["special_tokens_mask"][idx][:start_msg_index] = 1
         inputs["special_tokens_mask"][idx][end_msg_index:] = 1
 
@@ -67,7 +70,7 @@ def init_model_tokenizer(
     model = RobertaForMaskedLM.from_pretrained(model_name)
     model.to(device)
 
-    tokenizer = RobertaTokenizer.from_pretrained(tokenizer_name)
+    tokenizer = RobertaTokenizerFast.from_pretrained(tokenizer_name, use_fast=True)
     tokenizer.add_tokens(["<ide>", "<add>", "<del>", "<msg>", "<path>"], special_tokens=True)
     model.resize_token_embeddings(len(tokenizer))
     return model, tokenizer
@@ -155,7 +158,7 @@ def main():
     print(f"ℹ️  Loading Dataset")
     tokenized_dataset = prepare_dataset(training_args, tokenizer, preprocess)
 
-    data_collator = DataCollatorForWholeWordMask(
+    data_collator = DataCollatorForLanguageModeling(
         tokenizer=tokenizer, mlm=True, mlm_probability=0.5
     )
 
