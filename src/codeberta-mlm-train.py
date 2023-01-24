@@ -11,7 +11,7 @@ from transformers import (
     Trainer,
     RobertaForMaskedLM,
     EarlyStoppingCallback,
-    DataCollatorForLanguageModeling
+    DataCollatorForWholeWordMask,
 )
 
 from utils import (
@@ -37,25 +37,21 @@ def preprocess(training_args: RunArgs, tokenizer: RobertaTokenizer, examples):
         # We use this option because DataCollatorForLanguageModeling (see below) is more efficient when it
         # receives the `special_tokens_mask`.
         return_special_tokens_mask=True,
+        return_tensors="np"
     )
 
-    labels = []
-    for input_ids in inputs["input_ids"]:
-        start_msg_index = input_ids.index(tokenizer.sep_token_id) + 3  # </s></s><msg>
-        try:
-            end_msg_index = input_ids.index(tokenizer.pad_token_id)
-        except ValueError:
-            end_msg_index = len(input_ids)
-        label = np.asarray(input_ids.copy())
-        label[:start_msg_index] = -100
-        label[end_msg_index:] = -100
-        labels.append(label)
-        # mask = np.zeros(len(input_ids), dtype=bool)
-        # mask[start_msg_index:end_msg_index] = True
-        # masking_mask.append(mask)
+    # labels = []
+    inputs["labels"] = inputs["input_ids"].copy()
+    for idx in range(len(inputs["input_ids"])):
+        pad_tokens = np.argwhere(inputs["input_ids"][idx] == tokenizer.sep_token_id)
+        start_msg_index = pad_tokens[1][0] + 2
+        end_msg_index = pad_tokens[2][0]
 
-    # inputs["labels"] = inputs["input_ids"].copy()
-    inputs["labels"] = labels
+        inputs["labels"][idx][:start_msg_index] = -100
+        inputs["labels"][idx][end_msg_index:] = -100
+
+        inputs["special_tokens_mask"][idx][:start_msg_index] = 1
+        inputs["special_tokens_mask"][idx][end_msg_index:] = 1
 
     return inputs
 
@@ -95,46 +91,46 @@ def compute_metrics(metric, eval_pred):
     }
 
 
-def msg_masking_collator(tokenizer, features: list[list[int] | Any | dict[str, Any]]):
-    batch = tokenizer.pad(features, return_tensors="pt", pad_to_multiple_of=None)
-    # features = [torch.tensor(e, dtype=torch.long) for e in features]
-
-    inputs = batch["input_ids"].clone()
-    labels = batch["labels"].clone()
-    probability_matrix = torch.full(labels.shape, 0.5)
-
-    special_tokens_mask = batch.pop("special_tokens_mask")
-    special_tokens_mask = special_tokens_mask.bool()
-    probability_matrix.masked_fill_(special_tokens_mask, value=0.0)
-    probability_matrix.masked_fill_(labels == -100, value=0.0)
-
-    # masking_mask = batch.pop("masking_mask")
-    # masking_mask = masking_mask.bool()
-    # probability_matrix.masked_fill_(~masking_mask, value=0.0)
-
-    masked_indices = torch.bernoulli(probability_matrix).bool()
-    labels[~masked_indices] = -100  # We only compute loss on masked tokens
-
-    # 80% of the time, we replace masked input tokens with tokenizer.mask_token ([MASK])
-    indices_replaced = (
-        torch.bernoulli(torch.full(labels.shape, 0.8)).bool() & masked_indices
-    )
-    inputs[indices_replaced] = tokenizer.convert_tokens_to_ids(tokenizer.mask_token)
-
-    # 10% of the time, we replace masked input tokens with random word
-    indices_random = (
-        torch.bernoulli(torch.full(labels.shape, 0.5)).bool()
-        & masked_indices
-        & ~indices_replaced
-    )
-    random_words = torch.randint(len(tokenizer), labels.shape, dtype=torch.long)
-    inputs[indices_random] = random_words[indices_random]
-
-    # The rest of the time (10% of the time) we keep the masked input tokens unchanged
-    batch["input_ids"] = inputs
-    batch["labels"] = labels
-
-    return batch
+# def msg_masking_collator(tokenizer, features: list[list[int] | Any | dict[str, Any]]):
+#     batch = tokenizer.pad(features, return_tensors="pt", pad_to_multiple_of=None)
+#     # features = [torch.tensor(e, dtype=torch.long) for e in features]
+#
+#     inputs = batch["input_ids"].clone()
+#     labels = batch["labels"].clone()
+#     probability_matrix = torch.full(labels.shape, 0.5)
+#
+#     special_tokens_mask = batch.pop("special_tokens_mask")
+#     special_tokens_mask = special_tokens_mask.bool()
+#     probability_matrix.masked_fill_(special_tokens_mask, value=0.0)
+#     probability_matrix.masked_fill_(labels == -100, value=0.0)
+#
+#     # masking_mask = batch.pop("masking_mask")
+#     # masking_mask = masking_mask.bool()
+#     # probability_matrix.masked_fill_(~masking_mask, value=0.0)
+#
+#     masked_indices = torch.bernoulli(probability_matrix).bool()
+#     labels[~masked_indices] = -100  # We only compute loss on masked tokens
+#
+#     # 80% of the time, we replace masked input tokens with tokenizer.mask_token ([MASK])
+#     indices_replaced = (
+#         torch.bernoulli(torch.full(labels.shape, 0.8)).bool() & masked_indices
+#     )
+#     inputs[indices_replaced] = tokenizer.convert_tokens_to_ids(tokenizer.mask_token)
+#
+#     # 10% of the time, we replace masked input tokens with random word
+#     indices_random = (
+#         torch.bernoulli(torch.full(labels.shape, 0.5)).bool()
+#         & masked_indices
+#         & ~indices_replaced
+#     )
+#     random_words = torch.randint(len(tokenizer), labels.shape, dtype=torch.long)
+#     inputs[indices_random] = random_words[indices_random]
+#
+#     # The rest of the time (10% of the time) we keep the masked input tokens unchanged
+#     batch["input_ids"] = inputs
+#     batch["labels"] = labels
+#
+#     return batch
 
 
 def main():
@@ -158,6 +154,10 @@ def main():
 
     print(f"ℹ️  Loading Dataset")
     tokenized_dataset = prepare_dataset(training_args, tokenizer, preprocess)
+
+    data_collator = DataCollatorForWholeWordMask(
+        tokenizer=tokenizer, mlm=True, mlm_probability=0.5
+    )
 
     training_args = TrainingArguments(
         output_dir=str(model_output_path),
@@ -189,7 +189,8 @@ def main():
         eval_dataset=tokenized_dataset["valid"],
         compute_metrics=lambda eval_pred: compute_metrics(metric, eval_pred),
         preprocess_logits_for_metrics=preprocess_logits_for_metrics,
-        data_collator=lambda inputs: msg_masking_collator(tokenizer, inputs),
+        # data_collator=lambda inputs: msg_masking_collator(tokenizer, inputs),
+        data_collator=data_collator,
         callbacks=[EarlyStoppingCallback(early_stopping_patience=3)],
     )
 
