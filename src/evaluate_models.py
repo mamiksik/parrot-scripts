@@ -108,7 +108,7 @@ def main():
             print(f"===== END {model_name} =====")
 
     df = pd.DataFrame.from_records(results, columns=["Model", "Overall"] + SUPPORTED_LANGUAGES)
-    df.to_csv(Config.EVAL_OUTPUT, index=False)
+    df.to_csv(Config.GEN_EVAL_OUTPUT, index=False)
 
 
 if __name__ == '__main__':

@@ -25,8 +25,8 @@ wandb.init(config=hyperparameter_defaults, project="Testing")
 
 
 def preprocess(tokenizer, examples):
-    # messages = [f"<msg>{message}" for message in examples["message"]]
-    messages = [f"<msg> {patch[:150]}" for patch in examples["patch"]]
+    messages = [f"<msg>{message}" for message in examples["message"]]
+    # messages = [f"<msg> {patch[:150]}" for patch in examples["patch"]]
     inputs = tokenizer(
         examples["patch"], messages, padding="max_length", truncation="only_first"
     )
