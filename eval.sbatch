@@ -1,6 +1,7 @@
 #!/bin/bash
 # General Requirements
 #SBATCH --constraint="[a40|a100]&[avx2|avx]"
+#SBATCH --partition dmb
 
 # CPU Requirements
 #SBATCH -c 1
