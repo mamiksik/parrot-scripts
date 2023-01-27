@@ -19,8 +19,8 @@ def main(args):
         words[np.random.randint(0, len(words))] = '<mask>'
         patches.append(' '.join(words))
 
-    tokenizer = RobertaTokenizerFast.from_pretrained("CodeBERTa-commit-message-autocomplete")
-    model = RobertaForMaskedLM.from_pretrained("CodeBERTa-commit-message-autocomplete").to(args.device)
+    tokenizer = RobertaTokenizerFast.from_pretrained("mamiksik/CodeBERTa-commit-message-autocomplete")
+    model = RobertaForMaskedLM.from_pretrained("mamiksik/CodeBERTa-commit-message-autocomplete").to(args.device)
     pipe = pipeline("fill-mask", model=model, tokenizer=tokenizer)
 
     def run():
