@@ -191,8 +191,6 @@ def main():
 
     trainer = Trainer(
         accelerator=accelerator if not training_args.debug else None,
-        devices=2,
-        strategy="ddp",
         precision=16,
         default_root_dir=model_output_path / "checkpoints",
         logger=wandb_logger,
@@ -204,8 +202,8 @@ def main():
     if not training_args.debug:
         model.model.save_pretrained(model_output_path)
         new_model = T5ForConditionalGeneration.from_pretrained(model_output_path)
-        new_model.push_to_hub("CodeT5-commit-message-generator", commit_message=f"Experiment ID: {wandb_logger.experiment.id}")
-        tokenizer.push_to_hub("CodeT5-commit-message-generator", commit_message=f"Experiment ID: {wandb_logger.experiment.id}")
+        new_model.push_to_hub("T5-commit-message-generator", commit_message=f"Experiment ID: {wandb_logger.experiment.id}")
+        tokenizer.push_to_hub("T5-commit-message-generator", commit_message=f"Experiment ID: {wandb_logger.experiment.id}")
 
 
 if __name__ == "__main__":
