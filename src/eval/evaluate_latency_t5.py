@@ -34,8 +34,9 @@ def main(args):
         item = np.random.randint(0, len(dataset['test']))
         predict(model, tokenizer, dataset['test']['patch'][item], args)
 
+    print("Running...")
     t = timeit.Timer(run)
-    times = 1000000
+    times = 1_000
 
     device = args.device
     if device == "cuda":
