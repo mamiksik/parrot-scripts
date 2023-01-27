@@ -3,7 +3,14 @@
     <img src="images/logo.png" width="150">
 </p>
 
-Main repository for the Parrot commit assistant. 
+
+Commit messages provide insight into the developer’s intentions and motivations — a fundamental source of information in
+the exceptionally collaborative discipline of software development. 
+
+To assist the process of commit message writing we fine-tune two transformer models for commit message generation and 
+integrate them into popular code editors.
+
+![](images/autocomplet-preview.png)
 
 
 ### 🔌 Plugins for IDEs
