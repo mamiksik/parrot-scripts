@@ -7,25 +7,36 @@ from datasets import load_dataset
 from transformers import RobertaTokenizerFast, RobertaForMaskedLM, pipeline
 
 
-def predict(pipe, message):
-    _ = pipe(message)
+def predict(args, model, tokenizer, patch, message):
+    with torch.no_grad():
+        inputs = tokenizer(
+            patch, message, truncation=True, truncation_strategy="only_first", padding=True, return_tensors="pt"
+        )
+
+        mask_token_index = torch.where(inputs['input_ids'] == tokenizer.mask_token_id)[1]
+
+        inputs = inputs.to(args.device)
+        logits = model(**inputs).logits
+        mask_token_logits = logits[0, mask_token_index, :]
+        top_prediction = torch.topk(mask_token_logits, 1, dim=1).indices[:, 0].tolist()[0]
 
 
 def main(args):
     dataset = load_dataset("mamiksik/processed-commit-diffs")
     patches = []
-    for patch in dataset['test']['patch']:
-        words = patch.split()
+    messages = []
+    for message, patch in zip(dataset['test']['message'], dataset['test']['patch']):
+        words = message.split()
         words[np.random.randint(0, len(words))] = '<mask>'
-        patches.append(' '.join(words))
+        messages.append(' '.join(words))
+        patches.append(patch)
 
     tokenizer = RobertaTokenizerFast.from_pretrained("mamiksik/CodeBERTa-commit-message-autocomplete")
     model = RobertaForMaskedLM.from_pretrained("mamiksik/CodeBERTa-commit-message-autocomplete")
-    pipe = pipeline("fill-mask", model=model, tokenizer=tokenizer, device=-1 if args.device == "cpu" else 0)
 
     def run():
         item = np.random.randint(0, len(patches))
-        predict(pipe, patches[item])
+        predict(args, model, tokenizer, patches[item], messages[item])
 
     t = timeit.Timer(run)
     times = 1000
