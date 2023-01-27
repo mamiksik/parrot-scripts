@@ -32,7 +32,7 @@ def main(args):
         patches.append(patch)
 
     tokenizer = RobertaTokenizerFast.from_pretrained("mamiksik/CodeBERTa-commit-message-autocomplete")
-    model = RobertaForMaskedLM.from_pretrained("mamiksik/CodeBERTa-commit-message-autocomplete")
+    model = RobertaForMaskedLM.from_pretrained("mamiksik/CodeBERTa-commit-message-autocomplete").to(args.device)
 
     def run():
         item = np.random.randint(0, len(patches))
