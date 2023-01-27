@@ -20,15 +20,15 @@ def main(args):
         patches.append(' '.join(words))
 
     tokenizer = RobertaTokenizerFast.from_pretrained("mamiksik/CodeBERTa-commit-message-autocomplete")
-    model = RobertaForMaskedLM.from_pretrained("mamiksik/CodeBERTa-commit-message-autocomplete").to(args.device)
-    pipe = pipeline("fill-mask", model=model, tokenizer=tokenizer)
+    model = RobertaForMaskedLM.from_pretrained("mamiksik/CodeBERTa-commit-message-autocomplete")
+    pipe = pipeline("fill-mask", model=model, tokenizer=tokenizer, device=args.device)
 
     def run():
         item = np.random.randint(0, len(patches))
         predict(pipe, patches[item])
 
     t = timeit.Timer(run)
-    times = 1000000
+    times = 1000
 
     device = args.device
     if device == "cuda":
