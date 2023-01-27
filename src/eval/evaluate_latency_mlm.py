@@ -21,7 +21,7 @@ def main(args):
 
     tokenizer = RobertaTokenizerFast.from_pretrained("mamiksik/CodeBERTa-commit-message-autocomplete")
     model = RobertaForMaskedLM.from_pretrained("mamiksik/CodeBERTa-commit-message-autocomplete")
-    pipe = pipeline("fill-mask", model=model, tokenizer=tokenizer, device=args.device)
+    pipe = pipeline("fill-mask", model=model, tokenizer=tokenizer, device=-1 if args.device == "cpu" else 0)
 
     def run():
         item = np.random.randint(0, len(patches))
