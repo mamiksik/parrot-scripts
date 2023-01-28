@@ -190,6 +190,7 @@ def main():
     )
 
     trainer = Trainer(
+        devices=2,
         accelerator=accelerator if not training_args.debug else None,
         precision=16,
         default_root_dir=model_output_path / "checkpoints",
