@@ -62,7 +62,7 @@ def evaluate_model(dataset, metric, model, *, for_lang=None, multi_file=False):
     if for_lang is not None:
         test_ds = test_ds.filter(lambda x: x["main_lang"] == for_lang, keep_in_memory=True)
 
-    if multi_file:
+    if not multi_file:
         test_ds = test_ds.filter(lambda x: x["file_count"] == 1, keep_in_memory=True)
 
     to_process = len(test_ds)

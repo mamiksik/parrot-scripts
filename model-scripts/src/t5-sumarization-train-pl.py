@@ -31,7 +31,7 @@ def preprocess(training_args: RunArgs, tokenizer: RobertaTokenizer, examples):
     model_inputs = tokenizer(
         inputs,
         max_length=training_args.max_input_size,
-        padding="max_length",
+        # padding="max_length",
         truncation=True,
     )
 
@@ -39,7 +39,7 @@ def preprocess(training_args: RunArgs, tokenizer: RobertaTokenizer, examples):
     labels = tokenizer(
         list(commit_message),
         max_length=training_args.max_target_size,
-        padding="max_length",
+        # padding="max_length",
         truncation=True,
         return_tensors="np",
     ).input_ids
@@ -202,8 +202,8 @@ def main():
     if not training_args.debug:
         model.model.save_pretrained(model_output_path)
         new_model = T5ForConditionalGeneration.from_pretrained(model_output_path)
-        new_model.push_to_hub("mamiksik/T5-commit-message-generator", commit_message=f"Experiment ID: {wandb_logger.experiment.id}")
-        tokenizer.push_to_hub("mamiksik/T5-commit-message-generator", commit_message=f"Experiment ID: {wandb_logger.experiment.id}")
+        new_model.push_to_hub("mamiksik/T5-commit-message-generation", commit_message=f"Experiment ID: {wandb_logger.experiment.id}")
+        tokenizer.push_to_hub("mamiksik/T5-commit-message-generation", commit_message=f"Experiment ID: {wandb_logger.experiment.id}")
 
 
 if __name__ == "__main__":
