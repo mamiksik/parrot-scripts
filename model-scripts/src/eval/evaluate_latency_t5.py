@@ -47,6 +47,6 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--device", type=str, choices=["cpu", "cuda"])
+    parser.add_argument("--device", type=str, choices=["cpu", "cuda", "mps"])
 
     main(parser.parse_args())

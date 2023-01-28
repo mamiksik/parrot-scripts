@@ -80,9 +80,10 @@ def main():
     dataset = load_dataset("mamiksik/processed-commit-diffs")
 
     models = {
-        "T5 Pytorch": BleuT5('mamiksik/CommitPredictorT5', 'mamiksik/CommitPredictorT5PL', model_revision="5dc6ce5"),
-        "T5 Multifile": BleuT5('mamiksik/CommitPredictorT5', 'mamiksik/CommitPredictorT5PL', model_revision="fb08d01"),
-        "T5 Base Multi Sum": BleuT5('Salesforce/codet5-base-multi-sum', 'Salesforce/codet5-base-multi-sum')
+        "New Model": BleuT5('mamiksik/T5-commit-message-generator', 'mamiksik/T5-commit-message-generator'),
+        # "T5 Pytorch": BleuT5('mamiksik/CommitPredictorT5', 'mamiksik/CommitPredictorT5PL', model_revision="5dc6ce5"),
+        # "T5 Multifile": BleuT5('mamiksik/CommitPredictorT5', 'mamiksik/CommitPredictorT5PL', model_revision="fb08d01"),
+        # "T5 Base Multi Sum": BleuT5('Salesforce/codet5-base-multi-sum', 'Salesforce/codet5-base-multi-sum')
     }
 
     results = []
