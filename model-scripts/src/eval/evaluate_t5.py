@@ -1,4 +1,5 @@
 import gc
+from pathlib import Path
 
 import pandas as pd
 from datasets import load_dataset
@@ -8,8 +9,6 @@ from tqdm import tqdm
 
 import torch
 from transformers import RobertaTokenizer, T5ForConditionalGeneration
-
-from utils import Config
 
 SUPPORTED_LANGUAGES = ["Java", "Go", "PHP", "Javascript", "Ruby", "Python"]
 DEVICE = torch.device("cuda")
@@ -108,8 +107,9 @@ def main():
 
             print(f"===== END {model_name} =====")
 
+    relative_root = Path(__file__).parent.resolve() / "../.."
     df = pd.DataFrame.from_records(results, columns=["Model", "Overall"] + SUPPORTED_LANGUAGES)
-    df.to_csv(Config.GEN_EVAL_OUTPUT, index=False)
+    df.to_csv(relative_root / "gen_eval_result.csv", index=False)
 
 
 if __name__ == '__main__':
