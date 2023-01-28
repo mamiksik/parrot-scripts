@@ -28,15 +28,15 @@ class BleuT5:
         with torch.no_grad():
             with torch.cuda.amp.autocast():
                 input = self.tokenizer(batch, truncation=True, padding=True, return_tensors='pt').to(DEVICE)
-                outputs = self.model.generate(input.input_ids, max_length=100, min_length=10, num_beams=7)
+                outputs = self.model.generate(input.input_ids, max_length=128, min_length=2, num_beams=7)
                 del input
 
         return self.tokenizer.batch_decode(outputs, skip_special_tokens=True)
 
     def predict_one(self, lang, patch):
         with torch.no_grad():
-            input_ids = self.tokenizer(f"{patch}", truncation=True, padding=True, return_tensors='pt').to(DEVICE).input_ids
-            outputs = self.model.generate(input_ids, max_length=128, min_length=2, num_beams=7)
+            input_ids = self.tokenizer(patch, truncation=True, padding=True, return_tensors='pt').to(DEVICE).input_ids
+            outputs = self.model.generate(input_ids, max_length=128, min_length=2, num_beams=7, num_return_sequences=1)
         return self.tokenizer.decode(outputs[0], skip_special_tokens=True)
 
     def __enter__(self):
