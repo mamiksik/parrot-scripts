@@ -2,6 +2,7 @@ import gc
 import itertools
 from abc import ABC
 import random
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -13,7 +14,9 @@ from tqdm import tqdm
 import torch
 from transformers import RobertaTokenizer, RobertaForMaskedLM, pipeline
 
-from utils import Config
+relative_root = Path(__file__).parent.resolve() / "../.."
+COM_EVAL_OUTPUT = relative_root / 'com_eval_result.csv'
+
 
 SUPPORTED_LANGUAGES = ["Java", "Go", "PHP", "Javascript", "Ruby", "Python"]
 
@@ -106,7 +109,7 @@ def main():
         acc.append(evaluate(dataset, model_url, model_name, compatibility_mode))
 
     df = pd.DataFrame.from_records(acc, columns=["Model", "Overall"] + SUPPORTED_LANGUAGES)
-    df.to_csv(Config.COM_EVAL_OUTPUT, index=False)
+    df.to_csv(COM_EVAL_OUTPUT, index=False)
 
     # # for model, tokenizer in models:
     # # compatibility_mode = True
