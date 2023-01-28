@@ -53,10 +53,14 @@ class BleuT5:
 def evaluate_batch(metric, batch, model):
     labels = batch['message']
     predictions = model.predict_batch(batch)
-    return metric.compute(predictions=predictions, references=labels, smooth=True)['bleu']
+    return predictions, labels
+    # return metric.compute(predictions=predictions, references=labels, smooth=True)['bleu']
 
 
 def evaluate_model(dataset, metric, model, *, for_lang=None, multi_file=False):
+    predictions = []
+    labels = []
+
     batch_size = 64
     test_ds = dataset['test']
     if for_lang is not None:
@@ -68,10 +72,16 @@ def evaluate_model(dataset, metric, model, *, for_lang=None, multi_file=False):
     to_process = len(test_ds)
     trials = []
     for i in tqdm(range(0, to_process, batch_size)):
-        trials.append(evaluate_batch(metric, test_ds[i:i+batch_size], model))
+        # trials.append(evaluate_batch(metric, test_ds[i:i+batch_size], model))
+        p, l = evaluate_batch(metric, test_ds[i:i+batch_size], model)
+        predictions.extend(p)
+        labels.extend(l)
 
-    avg = sum(trials) / len(trials)
-    return round(avg * 100, 2)
+    # avg = sum(trials) / len(trials)
+    # return round(avg * 100, 2)
+    return round(
+        metric.compute(predictions=predictions, references=labels, smooth=True)['bleu'] * 100, 2
+    )
 
 
 def main():

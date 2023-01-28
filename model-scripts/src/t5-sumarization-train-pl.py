@@ -31,7 +31,7 @@ def preprocess(training_args: RunArgs, tokenizer: RobertaTokenizer, examples):
     model_inputs = tokenizer(
         inputs,
         max_length=training_args.max_input_size,
-        # padding="max_length",
+        padding="max_length",
         truncation=True,
     )
 
@@ -39,7 +39,7 @@ def preprocess(training_args: RunArgs, tokenizer: RobertaTokenizer, examples):
     labels = tokenizer(
         list(commit_message),
         max_length=training_args.max_target_size,
-        # padding="max_length",
+        padding="max_length",
         truncation=True,
         return_tensors="np",
     ).input_ids
